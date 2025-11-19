@@ -13,6 +13,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap" rel="stylesheet">
   <!-- Icons & Social -->
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <!-- Ably Realtime (for remote control) -->
+  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
   <meta property="og:title" content="Creator Clash — Autobattler" />
   <meta property="og:description" content="Gacha, merge, and autobattle your squad vs Dollar Kuning." />
   <meta property="og:type" content="website" />
@@ -37,6 +39,8 @@
         <div class="currency">
           <div class="currency-label">💰 Crystals</div>
           <div id="crystals" class="currency-value">900</div>
+          <div class="currency-label" style="margin-left:14px">🔷 Shards</div>
+          <div id="shards" class="currency-value">0</div>
           <button id="toggleSfxBtn" class="btn-secondary" title="Toggle sound effects" style="margin-left:10px">🔊</button>
           <button id="toggleStreamerBtn" class="btn-secondary" title="Toggle Streamer Mode (hotkey: S)" style="margin-left:8px">🎥 Stream Off</button>
         </div>
@@ -109,6 +113,20 @@
               <button id="defaultSettingsBtn" class="btn-outline">↩ Reset Defaults</button>
               <button id="clearSaveBtn" class="btn-outline" title="Clear local save">🧹 Clear Save</button>
             </div>
+
+            <!-- Remote Control (opt-in) -->
+            <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.15)">
+              <div style="font-weight:700; margin-bottom:6px">Remote Control</div>
+              <label style="display:flex; align-items:center; gap:8px">
+                <input type="checkbox" id="allowRemoteChk" /> Allow Remote Events (opt-in)
+              </label>
+              <div style="display:flex; gap:6px; align-items:center; margin-top:6px">
+                <label>Room <input id="roomCodeInput" type="text" readonly style="width:120px" placeholder="(off)" /></label>
+                <button id="copyRoomBtn" class="btn-outline" title="Copy room code">Copy</button>
+                <a id="openControlLink" class="btn-outline" href="control.html" target="_blank" rel="noopener">Open Control</a>
+              </div>
+              <small class="last-pull">Share room code ke panel kontrol. Matikan kapan saja.</small>
+            </div>
           </div>
         </div>
 
@@ -120,6 +138,7 @@
             <div style="display:flex; gap:6px; flex-wrap:wrap">
               <button id="devC100" class="btn-outline">+100💰</button>
               <button id="devC1000" class="btn-outline">+1000💰</button>
+              <button id="devS10" class="btn-outline">+10🔷</button>
               <button id="devHealTeam" class="btn-outline">Full Heal Team</button>
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap">
@@ -170,6 +189,8 @@
 
   <!-- game logic (modular) -->
   <script type="module" src="src/main.js"></script>
+
+  <!-- control panel (standalone) will be loaded from control.html -->
 
   <!-- Victory Recap Modal -->
   <div id="victoryModal" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:1000" aria-hidden="true">

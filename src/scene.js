@@ -1,5 +1,6 @@
-import { YOUTUBER_POOL, RATES, BUFF, ENEMY_BASE, GACHA_COST, PITY, ENEMY_THEMES, CRIT } from "./constants.js";
+import { YOUTUBER_POOL, RATES, BUFF, ENEMY_BASE, GACHA_COST, PITY, ENEMY_THEMES, CRIT, UPGRADE, ASCEND } from "./constants.js";
 import { colorForRarity, emojiForRarity, pickRarity, pickByRarity } from "./utils.js";
+import Remote from "./remote.js";
 
 // Module-scoped team state
 let team = [];
@@ -12,7 +13,7 @@ export class MainScene extends Phaser.Scene {
 
   preload() {}
 
-  create() {
+  async create() {
     this.add.rectangle(360, 240, 720, 480, 0x08121b);
 
     // Enemy
@@ -42,7 +43,7 @@ export class MainScene extends Phaser.Scene {
     );
 
     this.setupHtmlHooks();
-    this.initState();
+    await this.initState();
     this.renderTeamSprites();
     this.setEnemy();
     this.createSfxIcon();
@@ -57,16 +58,23 @@ export class MainScene extends Phaser.Scene {
     this.teamListEl = document.getElementById("teamList");
     this.battleLogEl = document.getElementById("battleLog");
     this.crystalsEl = document.getElementById("crystals");
+    this.shardsEl = document.getElementById("shards");
     this.ratesInfoEl = document.getElementById("ratesInfo");
     this.pityInfoEl = document.getElementById("pityInfo");
     this.stageLabelEl = document.getElementById("stageLabel");
     this.clearSaveBtn = document.getElementById("clearSaveBtn");
     this.toggleSfxBtn = document.getElementById("toggleSfxBtn");
     this.toggleStreamerBtn = document.getElementById("toggleStreamerBtn");
+    // Remote control hooks
+    this.allowRemoteChk = document.getElementById("allowRemoteChk");
+    this.roomCodeInput = document.getElementById("roomCodeInput");
+    this.copyRoomBtn = document.getElementById("copyRoomBtn");
+    this.openControlLink = document.getElementById("openControlLink");
     // Developer panel hooks
     this.devPanel = document.getElementById("devPanel");
     this.devC100 = document.getElementById("devC100");
     this.devC1000 = document.getElementById("devC1000");
+    this.devS10 = document.getElementById("devS10");
     this.devHealTeamBtn = document.getElementById("devHealTeam");
     this.devAddCommon = document.getElementById("devAddCommon");
     this.devAddRare = document.getElementById("devAddRare");
@@ -101,6 +109,12 @@ export class MainScene extends Phaser.Scene {
     };
     this.getCrystals = getCrystals;
     this.setCrystals = setCrystals;
+    const getShards = () => Number(this.shardsEl?.innerText || 0) || 0;
+    const setShards = (val) => {
+      if (this.shardsEl) this.shardsEl.innerText = String(Math.max(0, Number(val) || 0));
+    };
+    this.getShards = getShards;
+    this.setShards = setShards;
     const canAfford = (count) => getCrystals() >= (count === 10 ? GACHA_COST[10] : GACHA_COST[1]);
     const spend = (count) => {
       const cost = count === 10 ? GACHA_COST[10] : GACHA_COST[1];
@@ -115,6 +129,11 @@ export class MainScene extends Phaser.Scene {
       this.gachaBtn.setAttribute("aria-pressed", String(affordable));
     };
     this.updateGachaBtnState = updateGachaBtnState;
+
+    this.upgradeCostCrystals = (member) => {
+      const lvl = Math.max(1, Number(member?.level) || 1);
+      return Math.max(UPGRADE.base, UPGRADE.base + UPGRADE.perLevel * (lvl - 1));
+    };
 
     const updateRatesInfo = () => {
       if (!this.ratesInfoEl) return;
@@ -131,9 +150,11 @@ export class MainScene extends Phaser.Scene {
     this.pityConfig = { epic: PITY.epic, legend: PITY.legend };
     this.crit = { chance: CRIT.chance, mult: CRIT.mult };
     this.sfxMuted = false;
-    this.streamerMode = false;
+    this.streamerMode = true;
     this.victoryShown = false;
     this.devMode = false;
+    this.remoteAllowed = false;
+    this.roomCode = "";
     const updateStageLabel = () => {
       if (this.stageLabelEl) this.stageLabelEl.textContent = `Stage ${this.wave}`;
     };
@@ -227,6 +248,7 @@ export class MainScene extends Phaser.Scene {
       this.pityEpic = 0;
       this.pityLegend = 0;
       this.setCrystals(900);
+      this.setShards(0);
       this.updateStageLabel();
       this.updateGachaBtnState();
       this.updatePityInfo();
@@ -414,6 +436,13 @@ export class MainScene extends Phaser.Scene {
       this.saveState();
       this.log(`🧪 Dev: +${amt} Crystals (now ${before + amt})`);
     };
+    const addShards = (amt) => {
+      if (guardBattle()) return;
+      const before = this.getShards?.() ?? 0;
+      this.setShards?.(before + amt);
+      this.saveState();
+      this.log(`🧪 Dev: +${amt} Shards (now ${before + amt})`);
+    };
     const addByRarity = (rarity) => {
       if (guardBattle()) return;
       const sample = pickByRarity(YOUTUBER_POOL, rarity);
@@ -482,6 +511,7 @@ export class MainScene extends Phaser.Scene {
     };
     this.devC100?.addEventListener('click', () => addCrystals(100));
     this.devC1000?.addEventListener('click', () => addCrystals(1000));
+    this.devS10?.addEventListener('click', () => addShards(10));
     this.devHealTeamBtn?.addEventListener('click', () => fullHeal());
     this.devAddCommon?.addEventListener('click', () => addByRarity('common'));
     this.devAddRare?.addEventListener('click', () => addByRarity('rare'));
@@ -494,21 +524,89 @@ export class MainScene extends Phaser.Scene {
     this.devSetEnemyHp?.addEventListener('click', () => setEnemyHp(this.devEnemyHpInput?.value));
     this.devForceWin?.addEventListener('click', () => forceWin());
     this.devToggleStream?.addEventListener('click', () => { this.streamerMode = !this.streamerMode; this.applyStreamerMode?.(); this.setStreamerBtnLabel?.(); this.saveState(); });
+
+    // expose dev actions for remote control
+    this.devActions = { addCrystals, addShards, addByRarity, addByName, setStage, setEnemyHp, forceWin, fullHeal };
+
+    // Remote control logic (opt-in)
+    const randRoom = () => (Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || "ROOM01");
+    const setRoomUi = () => {
+      if (this.roomCodeInput) this.roomCodeInput.value = this.remoteAllowed ? this.roomCode : '';
+      if (this.openControlLink) {
+        const base = location.origin + location.pathname.replace(/index\.html?$/, '');
+        const url = new URL(base + 'control.html');
+        if (this.remoteAllowed && this.roomCode) url.hash = '#room=' + this.roomCode;
+        this.openControlLink.href = url.toString();
+      }
+    };
+    this._remoteConnected = false;
+    const connectRemote = async () => {
+      if (!this.remoteAllowed) return;
+      if (!this.roomCode) this.roomCode = randRoom();
+      try {
+        await Remote.connect(this.roomCode);
+        await Remote.subscribe((data) => this.handleRemoteEvent?.(data));
+        this._remoteConnected = true;
+        this.log(`🛰 Remote connected (room ${this.roomCode})`);
+      } catch (e) {
+        this._remoteConnected = false;
+        this.log('⚠️ Remote connect failed');
+      }
+      setRoomUi(); this.saveState();
+    };
+    const disconnectRemote = async () => {
+      try { await Remote.disconnect(); } catch {}
+      this._remoteConnected = false; setRoomUi(); this.saveState();
+      this.log('🛰 Remote disconnected');
+    };
+    this.handleRemoteEvent = (msg) => {
+      if (!msg || !msg.type) return;
+      const now = Date.now();
+      if (!this._lastRemote || now - this._lastRemote > 150) this._lastRemote = now; else return;
+      const A = this.devActions;
+      switch (msg.type) {
+        case 'addCrystals': A?.addCrystals?.(parseInt(msg.payload?.amount, 10) || 0); break;
+        case 'fullHeal': A?.fullHeal?.(); break;
+        case 'forceVictory': A?.forceWin?.(); break;
+        case 'addByRarity': if (msg.payload?.rarity) A?.addByRarity?.(String(msg.payload.rarity)); break;
+        case 'addByName': if ((msg.payload?.name || '').trim()) A?.addByName?.(String(msg.payload.name)); break;
+        case 'setStage': if (msg.payload?.stage) A?.setStage?.(parseInt(msg.payload.stage, 10)); break;
+        case 'setEnemyHp': if (msg.payload?.hp !== undefined) A?.setEnemyHp?.(parseInt(msg.payload.hp, 10)); break;
+        default: break;
+      }
+    };
+    const onRemoteToggle = async () => {
+      if (this.allowRemoteChk?.checked) {
+        this.remoteAllowed = true; if (!this.roomCode) this.roomCode = randRoom(); await connectRemote();
+      } else { this.remoteAllowed = false; await disconnectRemote(); }
+      setRoomUi(); this.saveState();
+    };
+    this.allowRemoteChk?.addEventListener('change', onRemoteToggle);
+    this.copyRoomBtn?.addEventListener('click', async () => {
+      if (!this.remoteAllowed || !this.roomCode) return;
+      try { await navigator.clipboard.writeText(this.roomCode); this.log('📋 Room copied'); } catch {}
+    });
   }
 
-  initState() {
+  async initState() {
     try {
       const raw = localStorage.getItem("cc_state_v1");
       if (!raw) return;
       const state = JSON.parse(raw);
       if (Array.isArray(state.team)) {
-        // restore team and nextId
-        // eslint-disable-next-line no-undef
-        team = state.team.map((m) => ({ ...m }));
+        // restore team and nextId (add defaults for new props)
+        team = state.team.map((m) => ({
+          ...m,
+          locked: !!m.locked,
+          rank: m.rank || 1,
+        }));
         nextId = typeof state.nextId === "number" ? state.nextId : (team.reduce((mx, m) => Math.max(mx, m.id || 0), 0) + 1);
       }
       if (typeof state.crystals === "number") {
         this.setCrystals(state.crystals);
+      }
+      if (typeof state.shards === "number") {
+        this.setShards(state.shards);
       }
       if (typeof state.wave === "number" && state.wave >= 1) {
         this.wave = state.wave;
@@ -525,7 +623,10 @@ export class MainScene extends Phaser.Scene {
         this.crit = { ...this.crit, ...state.crit };
       }
       if (typeof state.sfxMuted === "boolean") this.sfxMuted = state.sfxMuted;
-      if (typeof state.streamerMode === "boolean") this.streamerMode = state.streamerMode;
+      // Paksa streamerMode selalu aktif
+      this.streamerMode = true;
+      if (typeof state.remoteAllowed === "boolean") this.remoteAllowed = state.remoteAllowed;
+      if (typeof state.roomCode === "string") this.roomCode = state.roomCode;
       this.updateStageLabel?.();
       this.updateGachaBtnState?.();
       this.updatePityInfo?.();
@@ -535,6 +636,19 @@ export class MainScene extends Phaser.Scene {
       this.updateSfxIcon?.();
       this.setStreamerBtnLabel?.();
       this.applyStreamerMode?.();
+      if (this.allowRemoteChk) this.allowRemoteChk.checked = !!this.remoteAllowed;
+      // connect remote if allowed
+      try { if (this.remoteAllowed) {
+        const base = location.origin + location.pathname.replace(/index\.html?$/, '');
+        if (this.openControlLink) {
+          const url = new URL(base + 'control.html');
+          if (this.roomCode) url.hash = '#room=' + this.roomCode;
+          this.openControlLink.href = url.toString();
+        }
+        await Remote.connect(this.roomCode || (this.roomCode = (Math.random().toString(36).toUpperCase().slice(2,8))));
+        await Remote.subscribe((data) => this.handleRemoteEvent?.(data));
+        this._remoteConnected = true;
+      }} catch {}
     } catch (e) {
       console.warn("Failed to load state:", e);
     }
@@ -542,10 +656,22 @@ export class MainScene extends Phaser.Scene {
 
   saveState() {
     try {
+      const teamSave = team.map(m => ({
+        id: m.id,
+        name: m.name,
+        atk: m.atk,
+        hp: m.hp,
+        maxHp: m.maxHp,
+        level: m.level,
+        rarity: m.rarity,
+        locked: !!m.locked,
+        rank: m.rank || 1,
+      }));
       const state = {
-        team,
+        team: teamSave,
         nextId,
         crystals: this.getCrystals?.() ?? 0,
+        shards: this.getShards?.() ?? 0,
         wave: this.wave ?? 1,
         pityEpic: this.pityEpic ?? 0,
         pityLegend: this.pityLegend ?? 0,
@@ -554,6 +680,8 @@ export class MainScene extends Phaser.Scene {
         crit: this.crit,
         sfxMuted: this.sfxMuted,
         streamerMode: this.streamerMode,
+        remoteAllowed: this.remoteAllowed,
+        roomCode: this.roomCode,
       };
       localStorage.setItem("cc_state_v1", JSON.stringify(state));
     } catch (e) {
@@ -603,6 +731,8 @@ export class MainScene extends Phaser.Scene {
     const charSample = pickByRarity(YOUTUBER_POOL, rarity);
     const existing = team.find((c) => c.name === charSample.name);
     if (existing) {
+      if (existing.rank == null) existing.rank = 1;
+      if (existing.locked == null) existing.locked = false;
       existing.level += 1;
       existing.atk += BUFF.atkPerLevel;
       existing.hp += BUFF.hpPerLevel;
@@ -610,6 +740,11 @@ export class MainScene extends Phaser.Scene {
         existing.maxHp += BUFF.hpPerLevel;
       } else {
         existing.maxHp = existing.hp;
+      }
+      if (existing.level % 5 === 0) {
+        const before = this.getShards?.() ?? 0;
+        this.setShards?.(before + 1);
+        this.log(`🎁 Milestone ${existing.name} Lv ${existing.level}: +1 Shard`);
       }
       this.log(
         `🔥 Dupe! ${existing.name} naik ke Lv ${existing.level} (ATK ${existing.atk}, HP ${existing.hp})`
@@ -634,6 +769,8 @@ export class MainScene extends Phaser.Scene {
         maxHp: charSample.hp,
         level: 1,
         rarity: charSample.rarity,
+        rank: 1,
+        locked: false,
       };
       team.push(inst);
       this.log(`✨ Dapet ${emojiForRarity(inst.rarity)} ${inst.name} (Lv 1)`);
@@ -710,26 +847,113 @@ export class MainScene extends Phaser.Scene {
       div.className = "team-item";
       div.innerHTML = `
         <div>
-          <div class="team-name">${emojiForRarity(m.rarity)} ${m.name}</div>
-          <div class="team-meta">Lv ${m.level} • HP ${m.hp} • ATK ${m.atk}</div>
+          <div class="team-name">${emojiForRarity(m.rarity)} ${m.name}${m.locked ? ' <span title="Locked">🔒</span>' : ''}</div>
+          <div class="team-meta">Lv ${m.level} • HP ${m.hp} • ATK ${m.atk} ${m.rank ? `• Rank ${m.rank}` : ''}</div>
         </div>
-        <div style="text-align:right">
-          <button class="btn-secondary" data-id="${m.id}" style="font-size:12px;padding:6px 8px">⚡+</button>
+        <div style="text-align:right; position:relative">
+          <button class="btn-secondary team-action-btn" data-id="${m.id}" style="font-size:12px;padding:6px 8px">⚡+</button>
         </div>
       `;
       this.teamListEl.appendChild(div);
 
-      div.querySelector("button")?.addEventListener("click", () => {
-        m.level++;
-        m.atk += BUFF.atkPerLevel;
-        m.hp += BUFF.hpPerLevel;
-        if (typeof m.maxHp === "number") {
-          m.maxHp += BUFF.hpPerLevel;
-        } else {
-          m.maxHp = m.hp;
-        }
-        this.log(`⚙️ Upgrade manual ${m.name} -> Lv ${m.level}`);
-        this.renderTeamSprites();
+      // Context menu logic (polished)
+      const btn = div.querySelector(".team-action-btn");
+      btn?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // Remove any existing menu
+        document.querySelectorAll('.team-context-menu').forEach(el => el.remove());
+        const ascendEligible = m.level >= ASCEND.levelReq;
+        const costCrystal = this.upgradeCostCrystals(m);
+        const needShards = UPGRADE.shard;
+        const haveC = (this.getCrystals?.() ?? 0) >= costCrystal;
+        const haveS = (this.getShards?.() ?? 0) >= needShards;
+        const canUpgrade = haveC && haveS && !m.locked;
+        const upgradeTitle = canUpgrade ? '' : (!haveC ? `Butuh ${costCrystal} Crystals` : (!haveS ? `Butuh ${needShards} Shard` : (m.locked ? 'Unlock dulu' : '')));
+        const needAscShards = ASCEND.shards;
+        const haveAscShards = (this.getShards?.() ?? 0) >= needAscShards;
+        const canAscend = ascendEligible && haveAscShards && !m.locked;
+        const ascendTitle = canAscend ? '' : (!ascendEligible ? `Butuh Lv ${ASCEND.levelReq}` : (!haveAscShards ? `Butuh ${needAscShards} Shard` : (m.locked ? 'Unlock dulu' : '')));
+        // Build menu
+        const menu = document.createElement('div');
+        menu.className = 'team-context-menu';
+        menu.style.position = 'absolute';
+        menu.style.top = '28px';
+        menu.style.right = '0';
+        menu.style.zIndex = '100';
+        menu.innerHTML = `
+          <div class="menu-item ${canUpgrade ? '' : 'disabled'}" data-action="upgrade" title="${upgradeTitle}">⬆️ <span>Upgrade</span> <span style="opacity:.8">(${costCrystal}💰 + ${needShards}🔷)</span></div>
+          <div class="menu-item ${canAscend ? '' : 'disabled'}" data-action="ascend" title="${ascendTitle}">🌟 <span>Ascend</span> <span style=\"opacity:.8\">(${needAscShards}🔷)</span></div>
+          <div class="menu-sep"></div>
+          <div class="menu-item" data-action="lock">${m.locked ? '🔓 <span>Unlock</span>' : '🔒 <span>Lock</span>'}</div>
+          <div class="menu-item" data-action="info">ℹ️ <span>Info</span></div>
+        `;
+        btn.parentElement.appendChild(menu);
+
+        // Menu item handler
+        menu.querySelectorAll('.menu-item').forEach(item => {
+          item.addEventListener('click', (ev) => {
+            const action = item.getAttribute('data-action');
+            if (item.classList.contains('disabled')) return;
+            if (action === 'upgrade') {
+              const cost = this.upgradeCostCrystals(m);
+              const need = UPGRADE.shard;
+              const curC = this.getCrystals?.() ?? 0;
+              const curS = this.getShards?.() ?? 0;
+              if (m.locked) { this.log(`❌ ${m.name} terkunci`); return; }
+              if (curC < cost) { this.log(`❌ Crystals kurang: butuh ${cost}`); return; }
+              if (curS < need) { this.log(`❌ Shard kurang: butuh ${need}`); return; }
+              this.setCrystals?.(curC - cost);
+              this.setShards?.(curS - need);
+              m.level++;
+              m.atk += BUFF.atkPerLevel;
+              m.hp += BUFF.hpPerLevel;
+              if (typeof m.maxHp === "number") {
+                m.maxHp += BUFF.hpPerLevel;
+              } else {
+                m.maxHp = m.hp;
+              }
+              this.log(`⬆️ Upgrade ${m.name} -> Lv ${m.level} • Spent ${cost}💰 + ${need}🔷`);
+              this.renderTeamSprites();
+              this.updateGachaBtnState?.();
+              this.saveState();
+            } else if (action === 'ascend') {
+              if (!m.rank) m.rank = 1;
+              const need = ASCEND.shards;
+              const curS = this.getShards?.() ?? 0;
+              if (m.locked) { this.log(`❌ ${m.name} terkunci`); return; }
+              if (m.level < ASCEND.levelReq) { this.log(`❌ Ascend gagal: butuh Lv ${ASCEND.levelReq}`); return; }
+              if (curS < need) { this.log(`❌ Shard kurang: butuh ${need}`); return; }
+              this.setShards?.(curS - need);
+              m.rank++;
+              m.level = 1;
+              m.atk += ASCEND.atkBonus;
+              m.hp += ASCEND.hpBonus;
+              if (typeof m.maxHp === "number") m.maxHp += ASCEND.hpBonus; else m.maxHp = m.hp;
+              this.log(`🌟 Ascend ${m.name} -> Rank ${m.rank} • Spent ${need}🔷`);
+              this.renderTeamSprites();
+              this.updateGachaBtnState?.();
+              this.saveState();
+            } else if (action === 'lock') {
+              m.locked = !m.locked;
+              this.log(`${m.locked ? '🔒 Locked' : '🔓 Unlocked'} ${m.name}`);
+              this.renderTeamSprites();
+            } else if (action === 'info') {
+              alert(`Nama: ${m.name}\nLv: ${m.level}\nRank: ${m.rank || 1}\nHP: ${m.hp}\nATK: ${m.atk}\nRarity: ${m.rarity}${m.locked ? '\n[Locked]' : ''}`);
+            }
+            menu.remove();
+          });
+        });
+
+        // Close menu on click outside
+        setTimeout(() => {
+          const closeMenu = (ev) => {
+            if (!menu.contains(ev.target)) menu.remove();
+            document.removeEventListener('mousedown', closeMenu);
+          };
+          document.addEventListener('mousedown', closeMenu);
+          const escHandler = (ev) => { if (ev.key === 'Escape') { menu.remove(); document.removeEventListener('keydown', escHandler); } };
+          document.addEventListener('keydown', escHandler);
+        }, 0);
       });
     });
   }

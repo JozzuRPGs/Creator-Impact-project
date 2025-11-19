@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Creator Clash — Control</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; color: #cfeaff; background: #08121b; }
+    .wrap { max-width: 720px; margin: 24px auto; padding: 16px; border:1px solid rgba(255,255,255,0.15); border-radius: 12px; background: rgba(255,255,255,0.04); }
+    .row { display:flex; gap:8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .btn { background: rgba(255,255,255,0.08); color:#e6f4ff; border:1px solid rgba(255,255,255,0.2); border-radius: 8px; padding:8px 12px; cursor:pointer; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    input, select { background: rgba(255,255,255,0.08); color:#e6f4ff; border:1px solid rgba(255,255,255,0.2); border-radius:6px; padding:6px 8px; }
+    h1 { margin: 0 0 10px; font-size: 24px; }
+    small { opacity: .8 }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Remote Control</h1>
+    <div class="row">
+      <label>Room <input id="room" type="text" placeholder="ABC123" style="width:120px" /></label>
+      <button id="connect" class="btn">Connect</button>
+      <button id="disconnect" class="btn" disabled>Disconnect</button>
+      <small id="status">Not connected</small>
+    </div>
+
+    <div class="row">
+      <button class="btn" data-ev="addCrystals" data-amt="100">+100💰</button>
+      <button class="btn" data-ev="addCrystals" data-amt="1000">+1000💰</button>
+      <button class="btn" data-ev="fullHeal">Full Heal</button>
+      <button class="btn" data-ev="forceVictory">Force Victory</button>
+    </div>
+
+    <div class="row">
+      <select id="rarity">
+        <option value="common">Common</option>
+        <option value="rare">Rare</option>
+        <option value="epic">Epic</option>
+        <option value="legend">Legend</option>
+      </select>
+      <button class="btn" id="addByRarity">Add Unit (Rarity)</button>
+      <input id="name" type="text" placeholder="Name" style="width:160px" />
+      <button class="btn" id="addByName">Add Unit (Name)</button>
+    </div>
+
+    <div class="row">
+      <label>Stage <input id="stage" type="number" min="1" step="1" style="width:90px" /></label>
+      <button class="btn" id="setStage">Set Stage</button>
+      <label>Enemy HP <input id="ehp" type="number" min="0" step="1" style="width:110px" /></label>
+      <button class="btn" id="setEnemyHp">Set HP</button>
+    </div>
+
+    <small>Tip: Open from the game's Settings → Remote Control → Open Control to auto-fill room.</small>
+  </div>
+
+  <script type="module">
+    // helper to connect to Ably
+    let client = null; let channel = null; let roomCode = '';
+    const statusEl = document.getElementById('status');
+    const setStatus = (t) => statusEl.textContent = t;
+
+    function getRoomFromHash() {
+      const m = location.hash.match(/room=([A-Za-z0-9]+)/);
+      return m ? m[1] : '';
+    }
+
+    async function connect(room) {
+      if (!window.Ably) return setStatus('Ably SDK missing');
+      if (!room) { setStatus('Enter room'); return; }
+      client = new Ably.Realtime.Promise({ authUrl: '/api/ably-token' });
+      await client.connection.once('connected');
+      channel = client.channels.get(`creatorclash-${room}`);
+      roomCode = room;
+      setStatus(`Connected → ${room}`);
+      document.getElementById('connect').disabled = true;
+      document.getElementById('disconnect').disabled = false;
+    }
+    async function disconnect() {
+      try { if (channel) await channel.detach(); if (client) await client.close(); }
+      finally { channel = null; client = null; setStatus('Not connected'); document.getElementById('connect').disabled = false; document.getElementById('disconnect').disabled = true; }
+    }
+    async function publish(type, payload={}) {
+      if (!channel) return setStatus('Not connected');
+      await channel.publish(type, { type, payload, t: Date.now() });
+    }
+
+    // UI wiring
+    const roomInput = document.getElementById('room');
+    roomInput.value = getRoomFromHash();
+    document.getElementById('connect').onclick = () => connect(roomInput.value.trim());
+    document.getElementById('disconnect').onclick = () => disconnect();
+
+    // Quick buttons
+    document.querySelectorAll('[data-ev="addCrystals"]').forEach(btn => btn.onclick = () => publish('addCrystals', { amount: parseInt(btn.dataset.amt, 10) }));
+    document.getElementById('fullHeal').onclick = () => publish('fullHeal', {});
+    document.getElementById('forceVictory').onclick = () => publish('forceVictory', {});
+
+    document.getElementById('addByRarity').onclick = () => publish('addByRarity', { rarity: (document.getElementById('rarity').value) });
+    document.getElementById('addByName').onclick = () => publish('addByName', { name: (document.getElementById('name').value || '').trim() });
+
+    document.getElementById('setStage').onclick = () => publish('setStage', { stage: parseInt(document.getElementById('stage').value, 10) });
+    document.getElementById('setEnemyHp').onclick = () => publish('setEnemyHp', { hp: parseInt(document.getElementById('ehp').value, 10) });
+
+    // buttons without ids were selected via data-ev; ensure ids exist
+    document.getElementById('fullHeal').disabled = false;
+    document.getElementById('forceVictory').disabled = false;
+  </script>
+</body>
+</html>
