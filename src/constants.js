@@ -1,13 +1,16 @@
 // Core constants and simple data
 
 export const YOUTUBER_POOL = [
-  { name: "Windah", atk: 20, hp: 30, rarity: "legend" },
-  { name: "MiawAug", atk: 30, hp: 20, rarity: "legend" },
-  { name: "NapLive", atk: 10, hp: 20, rarity: "epic" },
-  { name: "Wielino", atk: 12, hp: 18, rarity: "epic" },
-  { name: "Mythia", atk: 7, hp: 15, rarity: "epic" },
-  { name: "Ray Restu", atk: 8, hp: 14, rarity: "rare" },
-  { name: "Dimsk", atk: 6, hp: 10, rarity: "rare" },
+  // Legend: higher base, one tanky, one DPS
+  { name: "Windah", atk: 22, hp: 32, rarity: "legend" },
+  { name: "MiawAug", atk: 26, hp: 28, rarity: "legend" },
+  // Epic: clearly above rare, some flavor differences
+  { name: "NapLive", atk: 12, hp: 22, rarity: "epic" },
+  { name: "Wielino", atk: 14, hp: 20, rarity: "epic" },
+  { name: "Mythia", atk: 11, hp: 18, rarity: "epic" },
+  // Rare: mid-tier baseline
+  { name: "Ray Restu", atk: 9, hp: 16, rarity: "rare" },
+  { name: "Dimsk", atk: 7, hp: 12, rarity: "rare" },
   { name: "Jozzu RPGs", atk: 5, hp: 12, rarity: "common" },
 ];
 
@@ -45,9 +48,14 @@ export const ASCEND = {
   levelReq: 5,
   shards: 3,
   rarityShardMult: RARITY_COST_MULT,
-  atkBonus: 5,
-  hpBonus: 10,
+  atkBonus: 7,
+  hpBonus: 14,
+  // Each additional rank increases bonus by this fraction (e.g., 0.25 => +25% per rank)
+  rankScale: 0.25,
 };
+
+// Rarity-based stat scaling per level (higher rarity scales faster)
+export const RARITY_STAT_MULT = { common: 1.0, rare: 1.2, epic: 1.5, legend: 2.0 };
 
 // Pity settings (number of pulls guaranteeing at least that rarity)
 export const PITY = { epic: 20, legend: 60 };

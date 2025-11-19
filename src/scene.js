@@ -1,4 +1,4 @@
-import { YOUTUBER_POOL, RATES, BUFF, ENEMY_BASE, GACHA_COST, PITY, ENEMY_THEMES, CRIT, UPGRADE, ASCEND } from "./constants.js";
+import { YOUTUBER_POOL, RATES, BUFF, ENEMY_BASE, GACHA_COST, PITY, ENEMY_THEMES, CRIT, UPGRADE, ASCEND, RARITY_STAT_MULT } from "./constants.js";
 import { colorForRarity, emojiForRarity, pickRarity, pickByRarity } from "./utils.js";
 import Remote from "./remote.js";
 
@@ -147,6 +147,15 @@ export class MainScene extends Phaser.Scene {
 
     // Cost helpers
     this._rarityMult = (rarity) => (UPGRADE?.rarityCostMult?.[rarity] ?? 1);
+    this._statMult = (member) => (RARITY_STAT_MULT?.[member?.rarity] ?? 1);
+    this.perLevelAtk = (member) => {
+      const mult = this._statMult(member);
+      return Math.max(1, Math.round(BUFF.atkPerLevel * mult));
+    };
+    this.perLevelHp = (member) => {
+      const mult = this._statMult(member);
+      return Math.max(1, Math.round(BUFF.hpPerLevel * mult));
+    };
     this.upgradeCostCrystals = (member) => {
       const lvl = Math.max(1, Number(member?.level) || 1);
       const base = Math.max(UPGRADE.base, UPGRADE.base + UPGRADE.perLevel * (lvl - 1));
@@ -160,6 +169,14 @@ export class MainScene extends Phaser.Scene {
       const base = Math.max(1, Number(ASCEND.shards) || 1);
       const mult = ASCEND?.rarityShardMult?.[member?.rarity] ?? 1;
       return Math.max(1, Math.round(base * mult));
+    };
+    this.ascendBonuses = (member) => {
+      const rank = Math.max(1, Number(member?.rank) || 1);
+      const mult = this._statMult(member);
+      const scale = 1 + (Number(ASCEND.rankScale) || 0) * (rank - 1);
+      const atk = Math.max(1, Math.round(ASCEND.atkBonus * mult * scale));
+      const hp = Math.max(1, Math.round(ASCEND.hpBonus * mult * scale));
+      return { atk, hp };
     };
 
     const updateRatesInfo = () => {
@@ -234,7 +251,8 @@ export class MainScene extends Phaser.Scene {
           .join(", ")} • Cost ${spent}`
       );
       this.renderTeamSprites();
-      this.flashGacha();
+      // Use enhanced flashy reveal
+      this.showGachaReveal?.(results, spent);
       updateGachaBtnState();
       this.saveState();
     };
@@ -556,10 +574,10 @@ export class MainScene extends Phaser.Scene {
       const existing = team.find((c) => c.name === sample.name);
       if (existing) {
         existing.level += 1;
-        existing.atk += BUFF.atkPerLevel;
-        existing.hp += BUFF.hpPerLevel;
+        existing.atk += this.perLevelAtk(existing);
+        existing.hp += this.perLevelHp(existing);
         existing.maxHp = (existing.maxHp || existing.hp);
-        existing.maxHp += BUFF.hpPerLevel;
+        existing.maxHp += this.perLevelHp(existing);
         this.log(`🧪 Dev: Dupe ${existing.name} -> Lv ${existing.level}`);
       } else {
         const inst = { id: nextId++, name: sample.name, atk: sample.atk, hp: sample.hp, maxHp: sample.hp, level: 1, rarity: sample.rarity };
@@ -575,7 +593,7 @@ export class MainScene extends Phaser.Scene {
       if (!sample) { this.log(`⚠️ Dev: Name not found: ${name}`); return; }
       const existing = team.find((c) => c.name === sample.name);
       if (existing) {
-        existing.level += 1; existing.atk += BUFF.atkPerLevel; existing.hp += BUFF.hpPerLevel; existing.maxHp = (existing.maxHp || existing.hp) + BUFF.hpPerLevel;
+        existing.level += 1; existing.atk += this.perLevelAtk(existing); existing.hp += this.perLevelHp(existing); existing.maxHp = (existing.maxHp || existing.hp) + this.perLevelHp(existing);
         this.log(`🧪 Dev: Dupe ${existing.name} -> Lv ${existing.level}`);
       } else {
         const inst = { id: nextId++, name: sample.name, atk: sample.atk, hp: sample.hp, maxHp: sample.hp, level: 1, rarity: sample.rarity };
@@ -812,9 +830,9 @@ export class MainScene extends Phaser.Scene {
   setEnemy() {
     const theme = ENEMY_THEMES[(this.wave - 1) % ENEMY_THEMES.length] || ENEMY_THEMES[0];
     const teamScale = Math.max(1, 1 + team.length * 0.15);
-    const stageScale = 1 + (this.wave - 1) * 0.2;
+    const stageScale = 1 + (this.wave - 1) * 0.12; // reduced HP growth (Package A)
     const baseHp = theme.hp * stageScale;
-    const baseAtk = theme.atk * (1 + (this.wave - 1) * 0.08);
+    const baseAtk = theme.atk * (1 + (this.wave - 1) * 0.06); // reduced ATK growth (Package A)
     this.enemy = {
       name: theme.name,
       hp: Math.round(baseHp * teamScale),
@@ -854,10 +872,10 @@ export class MainScene extends Phaser.Scene {
       if (existing.rank == null) existing.rank = 1;
       if (existing.locked == null) existing.locked = false;
       existing.level += 1;
-      existing.atk += BUFF.atkPerLevel;
-      existing.hp += BUFF.hpPerLevel;
+      existing.atk += this.perLevelAtk(existing);
+      existing.hp += this.perLevelHp(existing);
       if (typeof existing.maxHp === "number") {
-        existing.maxHp += BUFF.hpPerLevel;
+        existing.maxHp += this.perLevelHp(existing);
       } else {
         existing.maxHp = existing.hp;
       }
@@ -1025,10 +1043,10 @@ export class MainScene extends Phaser.Scene {
               this.setCrystals?.(curC - cost);
               this.setShards?.(curS - need);
               m.level++;
-              m.atk += BUFF.atkPerLevel;
-              m.hp += BUFF.hpPerLevel;
+              m.atk += this.perLevelAtk(m);
+              m.hp += this.perLevelHp(m);
               if (typeof m.maxHp === "number") {
-                m.maxHp += BUFF.hpPerLevel;
+                m.maxHp += this.perLevelHp(m);
               } else {
                 m.maxHp = m.hp;
               }
@@ -1046,10 +1064,11 @@ export class MainScene extends Phaser.Scene {
               this.setShards?.(curS - need);
               m.rank++;
               m.level = 1;
-              m.atk += ASCEND.atkBonus;
-              m.hp += ASCEND.hpBonus;
-              if (typeof m.maxHp === "number") m.maxHp += ASCEND.hpBonus; else m.maxHp = m.hp;
-              this.log(`🌟 Ascend ${m.name} -> Rank ${m.rank} • Spent ${need}🔷`);
+              const bonus = this.ascendBonuses(m);
+              m.atk += bonus.atk;
+              m.hp += bonus.hp;
+              if (typeof m.maxHp === "number") m.maxHp += bonus.hp; else m.maxHp = m.hp;
+              this.log(`🌟 Ascend ${m.name} -> Rank ${m.rank} (+${bonus.atk} ATK, +${bonus.hp} HP) • Spent ${need}🔷`);
               this.renderTeamSprites();
               this.updateGachaBtnState?.();
               this.saveState();
@@ -1096,6 +1115,89 @@ export class MainScene extends Phaser.Scene {
       const y = Phaser.Math.Between(30, 90);
       this.spawnParticles(x, y, 1, { life: 600, size: 4, speed: 30 });
     }
+  }
+
+  showGachaReveal(results = [], spent = 0) {
+    if (!Array.isArray(results) || results.length === 0) { this.flashGacha(); return; }
+    const overlay = this.add.container(0,0).setDepth(800);
+    const bg = this.add.rectangle(360,240,720,480,0x000000,0.78).setAlpha(0).setDepth(801);
+    overlay.add(bg);
+    this.tweens.add({ targets: bg, alpha: { from: 0, to: 0.78 }, duration: 240, ease: 'Cubic.easeOut' });
+    const isMulti = results.length > 1;
+    // radial burst base
+    const burst = this.add.circle(360,240,10,0xffffff,0.9).setDepth(802).setAlpha(0);
+    this.tweens.add({ targets: burst, alpha: { from:0, to:0.7 }, radius: { from:16, to: 180 }, duration: 500, ease:'Quad.easeOut', onComplete: () => burst.destroy() });
+    // color swirl particles
+    const rarityColors = { common: 0x9aa0b0, rare: 0x3d7dff, epic: 0x914dff, legend: 0xffd947 };
+    const totalParticles = 42 + results.length * 12;
+    for (let i=0;i<totalParticles;i++) {
+      const ang = Math.random()*Math.PI*2;
+      const dist = Phaser.Math.Between(10, 140);
+      const x = 360 + Math.cos(ang)*dist;
+      const y = 240 + Math.sin(ang)*dist;
+      this.spawnParticles(x,y,1,{ life: 700, size: Phaser.Math.Between(3,6), speed: 60});
+    }
+    // Card grid layout
+    const cols = isMulti ? Math.min(5, Math.ceil(results.length/2)) : 1;
+    const rows = isMulti ? Math.ceil(results.length / cols) : 1;
+    const cardW = 110; const cardH = 130; const gap = 18;
+    const totalW = cols*cardW + (cols-1)*gap;
+    const totalH = rows*cardH + (rows-1)*gap;
+    const startX = 360 - totalW/2 + cardW/2;
+    const startY = 240 - totalH/2 + cardH/2;
+    const cards = [];
+    results.forEach((r, idx) => {
+      const row = Math.floor(idx/cols);
+      const col = idx % cols;
+      const cx = startX + col*(cardW+gap);
+      const cy = startY + row*(cardH+gap);
+      const color = rarityColors[r.rarity] || 0xffffff;
+      const card = this.add.container(cx, cy).setDepth(803).setScale(0);
+      const rect = this.add.rectangle(0,0, cardW, cardH, 0x08121b, 0.85).setStrokeStyle(3, color, 1);
+      const nameTxt = this.add.text(0, -36, r.name, { color:'#ffffff', fontSize:14, fontStyle:'bold', align:'center', wordWrap:{ width: cardW-16 }}).setOrigin(0.5);
+      const rarityTxt = this.add.text(0, 4, `${emojiForRarity(r.rarity)} ${r.rarity.toUpperCase()}`, { color:'#ffffff', fontSize:13 }).setOrigin(0.5);
+      const levelTxt = this.add.text(0, 34, `Lv ${r.level}${r.rank?` • R${r.rank}`:''}`, { color:'#d9f2ff', fontSize:12 }).setOrigin(0.5);
+      card.add([rect, nameTxt, rarityTxt, levelTxt]);
+      overlay.add(card);
+      cards.push(card);
+      // reveal animation stagger
+      this.tweens.add({ targets: card, scale: { from:0, to:1.14 }, duration: 320, delay: idx*140, ease:'Back.easeOut' });
+      this.tweens.add({ targets: card, y: { from: cy+20, to: cy }, duration: 320, delay: idx*140, ease:'Cubic.easeOut' });
+      // rarity sparkle
+      const sparkleCount = r.rarity === 'legend' ? 22 : r.rarity === 'epic' ? 14 : r.rarity === 'rare' ? 8 : 4;
+      for (let s=0;s<sparkleCount;s++) {
+        const sx = cx + Phaser.Math.Between(-cardW/2+8, cardW/2-8);
+        const sy = cy + Phaser.Math.Between(-cardH/2+8, cardH/2-8);
+        this.spawnParticles(sx, sy, 1, { life: 500 + Phaser.Math.Between(-120,120), size: 3 + (r.rarity==='legend'?1:0), speed: 40 });
+      }
+      // sound
+      const baseFreq = r.rarity === 'legend' ? 880 : r.rarity === 'epic' ? 760 : r.rarity === 'rare' ? 640 : 520;
+      this.time.delayedCall(idx*140 + 40, () => this.beep(baseFreq, 90, 'triangle', 0.05));
+    });
+    // Title + cost
+    const title = this.add.text(360, 60, isMulti?`GACHA x${results.length}`:'GACHA', { color:'#ffffff', fontSize: isMulti? 30: 26, fontStyle:'900', align:'center' }).setOrigin(0.5).setDepth(804).setAlpha(0);
+    overlay.add(title);
+    this.tweens.add({ targets: title, alpha: { from:0, to:1 }, y: { from: 40, to: 60 }, duration: 420, ease:'Cubic.easeOut' });
+    const costTxt = this.add.text(360, 420, `Spent ${spent}💰 • Klik / Space untuk tutup`, { color:'#d0eaff', fontSize:14 }).setOrigin(0.5).setDepth(804).setAlpha(0);
+    overlay.add(costTxt);
+    this.tweens.add({ targets: costTxt, alpha: { from:0, to:1 }, duration: 400, delay: results.length*140, ease:'Cubic.easeOut' });
+    const finishDelay = results.length*140 + 800;
+    // Auto dismiss after some seconds if user ignores
+    const autoTimer = this.time.delayedCall(finishDelay + 6000, () => dismiss());
+    const dismiss = () => {
+      if (overlay.destroyed) return;
+      autoTimer.remove(false);
+      window.removeEventListener('keydown', keyHandler);
+      this.tweens.add({ targets: overlay.list, alpha: { from:1, to:0 }, duration: 280, ease:'Cubic.easeIn', onComplete: () => overlay.destroy() });
+    };
+    const keyHandler = (e) => {
+      if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Escape') {
+        dismiss();
+      }
+    };
+    window.addEventListener('keydown', keyHandler);
+    bg.setInteractive();
+    bg.on('pointerdown', () => dismiss());
   }
 
   async runBattle() {
