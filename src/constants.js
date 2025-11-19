@@ -26,6 +26,19 @@ export const ENEMY_BASE = { name: "Dollar Kuning", hp: 50, atk: 6 };
 
 export const GACHA_COST = { 1: 160, 10: 1600 };
 
+// Manual upgrade costs
+// base: flat crystals cost, perLevel: additional crystals per current level-1
+// shard: shards required per manual upgrade
+export const UPGRADE = { base: 240, perLevel: 40, shard: 1 };
+
+// Ascend requirements and bonuses
+export const ASCEND = {
+  levelReq: 5,
+  shards: 3,
+  atkBonus: 5,
+  hpBonus: 10,
+};
+
 // Pity settings (number of pulls guaranteeing at least that rarity)
 export const PITY = { epic: 20, legend: 60 };
 

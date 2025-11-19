@@ -49,6 +49,30 @@ npx vercel --prod
 	- HTML (`/` and `/index.html`): `Cache-Control: no-store` for instant updates.
 	- No rewrites are needed; everything serves from the project root.
 
+## Remote Control (Stage 2)
+Optional realtime “interrupt” for streams using Ably.
+
+### Setup
+- Create Ably account and get an API Key (REST key).
+- On Vercel, add an env var `ABLY_API_KEY` to the project.
+- Deploy. The serverless endpoint `/api/ably-token` issues short-lived tokens.
+
+### Game usage
+- In game Settings → Remote Control:
+	- Check “Allow Remote Events” to opt-in.
+	- A room code appears; share it with your control page.
+	- Click “Open Control” to open `control.html` with the room prefilled.
+
+### Control panel
+- Open `control.html` (can be hosted in the same deploy).
+- Enter the room (or use the prefilled `#room=CODE` URL) and Connect.
+- Use the buttons to publish events (add crystals, add unit, set stage, etc.).
+
+### Security & tips
+- Remote is off by default; streamer can disable anytime.
+- Token issued by `/api/ably-token` uses your Vercel env and stays server-side.
+- Add rate limits/restrictions in code if you plan public events.
+
 ## Notes
 - Gacha costs: 1x=160, 10x=1600. Button disables when crystals insufficient.
 - Team fully heals at battle start. HP/ATK grow on dupes/upgrades.

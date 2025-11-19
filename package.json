@@ -1,0 +1,11 @@
+{
+  "name": "creator-clash-autobattler",
+  "private": true,
+  "version": "0.1.0",
+  "type": "commonjs",
+  "description": "Static Phaser autobattler with optional realtime remote control",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "ably": "^1.2.45"
+  }
+}
