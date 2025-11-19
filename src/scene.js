@@ -53,6 +53,7 @@ export class MainScene extends Phaser.Scene {
     this.gachaBtn = document.getElementById("gachaBtn");
     this.battleBtn = document.getElementById("battleBtn");
     this.resetBtn = document.getElementById("resetBtn");
+    this.healTeamBtn = document.getElementById("healTeamBtn");
     this.pullCount = document.getElementById("pullCount");
     this.lastPull = document.getElementById("lastPull");
     this.teamListEl = document.getElementById("teamList");
@@ -178,6 +179,16 @@ export class MainScene extends Phaser.Scene {
       const hp = Math.max(1, Math.round(ASCEND.hpBonus * mult * scale));
       return { atk, hp };
     };
+    this.healCost = (member) => {
+      if (!member) return 0;
+      const maxHp = member.maxHp || member.hp || 0;
+      const curHp = member.hp || 0;
+      if (maxHp <= 0 || curHp >= maxHp) return 0;
+      const missingPct = 1 - curHp / maxHp;
+      const base = 35; // lowered base crystal cost
+      const rarityMult = this._rarityMult(member.rarity);
+      return Math.max(1, Math.round(base * missingPct * rarityMult));
+    };
 
     const updateRatesInfo = () => {
       if (!this.ratesInfoEl) return;
@@ -271,6 +282,20 @@ export class MainScene extends Phaser.Scene {
       updateGachaBtnState();
       this.saveState();
     };
+
+    this.healTeamBtn?.addEventListener('click', () => {
+      if (team.length === 0) { this.log('⚠️ Tidak ada anggota untuk heal'); return; }
+      const damaged = team.filter(m => (m.maxHp || m.hp) > m.hp);
+      if (damaged.length === 0) { this.log('✅ Semua anggota sudah full HP'); return; }
+      const totalCost = damaged.reduce((sum, m) => sum + this.healCost(m), 0);
+      const crystals = this.getCrystals?.() ?? 0;
+      if (crystals < totalCost) { this.log(`❌ Crystals kurang untuk heal: butuh ${totalCost}`); return; }
+      this.setCrystals?.(crystals - totalCost);
+      damaged.forEach(m => { m.hp = m.maxHp || m.hp; });
+      this.log(`🩹 Heal Team: ${damaged.length} anggota • Cost ${totalCost}💰`);
+      this.renderTeamSprites();
+      this.saveState();
+    });
 
     this.pullCount.onchange = updateGachaBtnState;
     // Manage gacha availability during battle
@@ -1018,9 +1043,13 @@ export class MainScene extends Phaser.Scene {
         menu.style.top = '28px';
         menu.style.right = '0';
         menu.style.zIndex = '100';
+        const healCost = this.healCost(m);
+        const canHeal = healCost > 0 && (this.getCrystals?.() ?? 0) >= healCost;
+        const healTitle = canHeal ? '' : (healCost === 0 ? 'Sudah full HP' : `Butuh ${healCost} Crystals`);
         menu.innerHTML = `
           <div class="menu-item ${canUpgrade ? '' : 'disabled'}" data-action="upgrade" title="${upgradeTitle}">⬆️ <span>Upgrade</span> <span style="opacity:.8">(${costCrystal}💰 + ${needShards}🔷)</span></div>
           <div class="menu-item ${canAscend ? '' : 'disabled'}" data-action="ascend" title="${ascendTitle}">🌟 <span>Ascend</span> <span style=\"opacity:.8\">(${needAscShards}🔷)</span></div>
+          <div class="menu-item ${canHeal ? '' : 'disabled'}" data-action="heal" title="${healTitle}">🩹 <span>Heal</span> <span style=\"opacity:.8\">(${healCost}💰)</span></div>
           <div class="menu-sep"></div>
           <div class="menu-item" data-action="lock">${m.locked ? '🔓 <span>Unlock</span>' : '🔒 <span>Lock</span>'}</div>
           <div class="menu-item" data-action="info">ℹ️ <span>Info</span></div>
@@ -1071,6 +1100,16 @@ export class MainScene extends Phaser.Scene {
               this.log(`🌟 Ascend ${m.name} -> Rank ${m.rank} (+${bonus.atk} ATK, +${bonus.hp} HP) • Spent ${need}🔷`);
               this.renderTeamSprites();
               this.updateGachaBtnState?.();
+              this.saveState();
+            } else if (action === 'heal') {
+              const cost = this.healCost(m);
+              if (cost <= 0) { this.log(`✅ ${m.name} sudah full HP`); return; }
+              const curC = this.getCrystals?.() ?? 0;
+              if (curC < cost) { this.log(`❌ Crystals kurang: butuh ${cost}`); return; }
+              this.setCrystals?.(curC - cost);
+              m.hp = m.maxHp || m.hp;
+              this.log(`🩹 Heal ${m.name} • Cost ${cost}💰`);
+              this.renderTeamSprites();
               this.saveState();
             } else if (action === 'lock') {
               m.locked = !m.locked;
