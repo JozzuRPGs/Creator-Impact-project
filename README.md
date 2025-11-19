@@ -1,4 +1,4 @@
-# Creator Clash — Autobattler (Modularized)
+# Creator Impact — Gacha Autobattler
 
 ## Structure
 - `index.html` — UI shell and script includes (Phaser CDN + `src/main.js`).
