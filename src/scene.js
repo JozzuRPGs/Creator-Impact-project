@@ -63,8 +63,23 @@ export class MainScene extends Phaser.Scene {
     this.pityInfoEl = document.getElementById("pityInfo");
     this.stageLabelEl = document.getElementById("stageLabel");
     this.clearSaveBtn = document.getElementById("clearSaveBtn");
+    this.saveGameBtn = document.getElementById("saveGameBtn");
+    this.fullResetBtn = document.getElementById("fullResetBtn");
     this.toggleSfxBtn = document.getElementById("toggleSfxBtn");
-    this.toggleStreamerBtn = document.getElementById("toggleStreamerBtn");
+    // Streamer modal elements
+    this.streamerModal = document.getElementById("streamerModal");
+    this.streamerCard = document.getElementById("streamerCard");
+    this.streamerCloseBtn = document.getElementById("streamerCloseBtn");
+    this.streamerHideSettingsChk = document.getElementById("streamerHideSettingsChk");
+    this.streamerHideLogChk = document.getElementById("streamerHideLogChk");
+    this.streamerHideRatesChk = document.getElementById("streamerHideRatesChk");
+    this.streamerHideCurrencyChk = document.getElementById("streamerHideCurrencyChk");
+    this.streamerHideGachaChk = document.getElementById("streamerHideGachaChk");
+    this.streamerMinimalChk = document.getElementById("streamerMinimalChk");
+    this.streamerDimRange = document.getElementById("streamerDimRange");
+    this.streamerDimEl = document.getElementById("dimOverlay");
+    this.streamerSaveGameBtn = document.getElementById("streamerSaveGameBtn");
+    this.streamerFullResetBtn = document.getElementById("streamerFullResetBtn");
     // Remote control hooks
     this.allowRemoteChk = document.getElementById("allowRemoteChk");
     this.roomCodeInput = document.getElementById("roomCodeInput");
@@ -130,9 +145,21 @@ export class MainScene extends Phaser.Scene {
     };
     this.updateGachaBtnState = updateGachaBtnState;
 
+    // Cost helpers
+    this._rarityMult = (rarity) => (UPGRADE?.rarityCostMult?.[rarity] ?? 1);
     this.upgradeCostCrystals = (member) => {
       const lvl = Math.max(1, Number(member?.level) || 1);
-      return Math.max(UPGRADE.base, UPGRADE.base + UPGRADE.perLevel * (lvl - 1));
+      const base = Math.max(UPGRADE.base, UPGRADE.base + UPGRADE.perLevel * (lvl - 1));
+      return Math.round(base * this._rarityMult(member?.rarity));
+    };
+    this.upgradeCostShards = (member) => {
+      const shards = Math.max(1, Number(UPGRADE.shard) || 1);
+      return Math.max(1, Math.round(shards * this._rarityMult(member?.rarity)));
+    };
+    this.ascendCostShards = (member) => {
+      const base = Math.max(1, Number(ASCEND.shards) || 1);
+      const mult = ASCEND?.rarityShardMult?.[member?.rarity] ?? 1;
+      return Math.max(1, Math.round(base * mult));
     };
 
     const updateRatesInfo = () => {
@@ -162,20 +189,28 @@ export class MainScene extends Phaser.Scene {
     updateStageLabel();
 
     // Streamer Mode UI helpers
-    const setStreamerBtnLabel = () => {
-      if (!this.toggleStreamerBtn) return;
-      this.toggleStreamerBtn.textContent = this.streamerMode ? "🎥 Stream On" : "🎥 Stream Off";
-    };
-    this.setStreamerBtnLabel = setStreamerBtnLabel;
     const applyStreamerMode = () => {
-      const on = !!this.streamerMode;
+      const on = true; // always-on streamer mode
+      const prefs = this.streamerPrefs || { hideSettings: true, hideLog: true, hideRates: true, hideCurrency: false, hideGacha: false, dim: 0, minimal: false };
       const settingsPanel = document.getElementById("settingsPanel");
       const battleLogPanel = this.battleLogEl?.closest?.(".panel-block");
-      if (settingsPanel) settingsPanel.style.display = on ? "none" : "";
-      if (battleLogPanel) battleLogPanel.style.display = on ? "none" : "";
-      if (this.ratesInfoEl) this.ratesInfoEl.style.display = on ? "none" : "";
-      if (this.pityInfoEl) this.pityInfoEl.style.display = on ? "none" : "";
-      setStreamerBtnLabel();
+      const headerCurrency = document.querySelector('.currency');
+      const gachaSection = document.querySelector('.gacha-section');
+      if (settingsPanel) settingsPanel.style.display = on && prefs.hideSettings ? "none" : "";
+      if (battleLogPanel) battleLogPanel.style.display = on && prefs.hideLog ? "none" : "";
+      if (this.ratesInfoEl) this.ratesInfoEl.style.display = on && prefs.hideRates ? "none" : "";
+      if (this.pityInfoEl) this.pityInfoEl.style.display = on && prefs.hideRates ? "none" : "";
+      if (headerCurrency) headerCurrency.style.display = on && prefs.hideCurrency ? 'none' : '';
+      if (gachaSection) gachaSection.style.display = on && prefs.hideGacha ? 'none' : '';
+      if (this.streamerDimEl) this.streamerDimEl.style.background = `rgba(0,0,0,${Math.max(0, Math.min(0.7, Number(prefs.dim) || 0))})`;
+      // sync checkboxes if modal exists
+      if (this.streamerHideSettingsChk) this.streamerHideSettingsChk.checked = !!prefs.hideSettings;
+      if (this.streamerHideLogChk) this.streamerHideLogChk.checked = !!prefs.hideLog;
+      if (this.streamerHideRatesChk) this.streamerHideRatesChk.checked = !!prefs.hideRates;
+      if (this.streamerHideCurrencyChk) this.streamerHideCurrencyChk.checked = !!prefs.hideCurrency;
+      if (this.streamerHideGachaChk) this.streamerHideGachaChk.checked = !!prefs.hideGacha;
+      if (this.streamerMinimalChk) this.streamerMinimalChk.checked = !!prefs.minimal;
+      if (this.streamerDimRange) this.streamerDimRange.value = String(prefs.dim ?? 0);
     };
     this.applyStreamerMode = applyStreamerMode;
 
@@ -257,6 +292,36 @@ export class MainScene extends Phaser.Scene {
       this.log("🧹 Save cleared. State reset to defaults.");
       this.saveState();
     });
+    // Manual save
+    this.saveGameBtn?.addEventListener("click", () => {
+      this.saveState();
+      this.log("💾 Manual save disimpan.");
+    });
+    // Full reset helper
+    const doFullReset = () => {
+      try { localStorage.removeItem("cc_state_v1"); } catch {}
+      team = [];
+      nextId = 1;
+      this.wave = 1;
+      this.pityEpic = 0;
+      this.pityLegend = 0;
+      this.setCrystals(900);
+      this.setShards(0);
+      this.updateStageLabel();
+      this.updateGachaBtnState();
+      this.updatePityInfo?.();
+      this.renderTeamSprites();
+      this.setEnemy();
+      this.log("♻️ Full reset selesai. Reload...");
+      this.saveState();
+      setTimeout(() => { try { location.reload(); } catch {} }, 600);
+    };
+    this.fullResetBtn?.addEventListener("click", doFullReset);
+    this.streamerFullResetBtn?.addEventListener("click", doFullReset);
+    this.streamerSaveGameBtn?.addEventListener("click", () => {
+      this.saveState();
+      this.log("💾 Manual save disimpan (Streamer Mode).");
+    });
     // Seed settings inputs
     const fillSettingsInputs = () => {
       if (!this.rateCommonEl) return;
@@ -319,23 +384,65 @@ export class MainScene extends Phaser.Scene {
       this.saveState();
     });
 
-    // Streamer mode toggle (button + hotkey S)
-    this.toggleStreamerBtn?.addEventListener("click", () => {
-      this.streamerMode = !this.streamerMode;
-      this.applyStreamerMode();
-      this.saveState();
-      if (!this.sfxMuted) this.beep(600, 70, 'sine', 0.04);
-    });
+    // Streamer Mode modal: open/close via 'S'
+    this.showStreamer = () => {
+      if (!this.streamerModal) return;
+      this.streamerModal.style.display = 'flex';
+      requestAnimationFrame(() => { if (this.streamerCard) { this.streamerCard.style.opacity = '1'; this.streamerCard.style.transform = 'scale(1)'; } });
+      if (!this.sfxMuted) this.beep(680, 70, 'sine', 0.04);
+    };
+    this.hideStreamer = () => {
+      if (!this.streamerModal) return;
+      if (this.streamerCard) { this.streamerCard.style.opacity = '0'; this.streamerCard.style.transform = 'scale(0.96)'; }
+      setTimeout(() => { if (this.streamerModal) this.streamerModal.style.display = 'none'; }, 180);
+    };
+    this.streamerCloseBtn?.addEventListener('click', () => this.hideStreamer());
+    if (this.streamerModal) {
+      // click outside to close
+      this.streamerModal.addEventListener('mousedown', (ev) => {
+        if (this.streamerCard && !this.streamerCard.contains(ev.target)) this.hideStreamer();
+      });
+    }
     this._streamerKeyHandler = (e) => {
       if (e.repeat) return;
       if (e.key && e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        this.streamerMode = !this.streamerMode;
-        this.applyStreamerMode();
-        this.saveState();
-        if (!this.sfxMuted) this.beep(600, 70, 'sine', 0.04);
+        const open = this.streamerModal && this.streamerModal.style.display !== 'none';
+        if (open) this.hideStreamer(); else this.showStreamer();
       }
     };
     window.addEventListener('keydown', this._streamerKeyHandler);
+
+    // Wire checkbox changes -> apply + save
+    const savePrefs = () => {
+      this.streamerPrefs = this.streamerPrefs || { hideSettings: true, hideLog: true, hideRates: true, hideCurrency: false, hideGacha: false, dim: 0, minimal: false };
+      this.streamerPrefs.hideSettings = !!this.streamerHideSettingsChk?.checked;
+      this.streamerPrefs.hideLog = !!this.streamerHideLogChk?.checked;
+      this.streamerPrefs.hideRates = !!this.streamerHideRatesChk?.checked;
+      this.streamerPrefs.hideCurrency = !!this.streamerHideCurrencyChk?.checked;
+      this.streamerPrefs.hideGacha = !!this.streamerHideGachaChk?.checked;
+      const dimVal = Number(this.streamerDimRange?.value || 0);
+      this.streamerPrefs.dim = isNaN(dimVal) ? 0 : Math.max(0, Math.min(0.7, dimVal));
+      // Minimal mode preset
+      const minimal = !!this.streamerMinimalChk?.checked;
+      this.streamerPrefs.minimal = minimal;
+      if (minimal) {
+        this.streamerPrefs.hideSettings = true;
+        this.streamerPrefs.hideLog = true;
+        this.streamerPrefs.hideRates = true;
+        this.streamerPrefs.hideCurrency = true;
+        this.streamerPrefs.hideGacha = true;
+        if ((this.streamerPrefs.dim ?? 0) < 0.25) this.streamerPrefs.dim = 0.35;
+      }
+      this.applyStreamerMode();
+      this.saveState();
+    };
+    this.streamerHideSettingsChk?.addEventListener('change', savePrefs);
+    this.streamerHideLogChk?.addEventListener('change', savePrefs);
+    this.streamerHideRatesChk?.addEventListener('change', savePrefs);
+    this.streamerHideCurrencyChk?.addEventListener('change', savePrefs);
+    this.streamerHideGachaChk?.addEventListener('change', savePrefs);
+    this.streamerMinimalChk?.addEventListener('change', savePrefs);
+    this.streamerDimRange?.addEventListener('input', savePrefs);
 
     // Victory recap wiring
     const showVictory = (reward, clearedStage, nextStage) => {
@@ -523,7 +630,7 @@ export class MainScene extends Phaser.Scene {
     this.devSetStage?.addEventListener('click', () => setStage(this.devStageInput?.value));
     this.devSetEnemyHp?.addEventListener('click', () => setEnemyHp(this.devEnemyHpInput?.value));
     this.devForceWin?.addEventListener('click', () => forceWin());
-    this.devToggleStream?.addEventListener('click', () => { this.streamerMode = !this.streamerMode; this.applyStreamerMode?.(); this.setStreamerBtnLabel?.(); this.saveState(); });
+    this.devToggleStream?.addEventListener('click', () => { this.showStreamer?.(); });
 
     // expose dev actions for remote control
     this.devActions = { addCrystals, addShards, addByRarity, addByName, setStage, setEnemyHp, forceWin, fullHeal };
@@ -613,6 +720,19 @@ export class MainScene extends Phaser.Scene {
       }
       if (typeof state.pityEpic === "number") this.pityEpic = state.pityEpic;
       if (typeof state.pityLegend === "number") this.pityLegend = state.pityLegend;
+      if (state.streamerPrefs && typeof state.streamerPrefs === 'object') {
+        this.streamerPrefs = {
+          hideSettings: !!state.streamerPrefs.hideSettings,
+          hideLog: !!state.streamerPrefs.hideLog,
+          hideRates: !!state.streamerPrefs.hideRates,
+          hideCurrency: !!state.streamerPrefs.hideCurrency,
+          hideGacha: !!state.streamerPrefs.hideGacha,
+          dim: typeof state.streamerPrefs.dim === 'number' ? state.streamerPrefs.dim : 0,
+          minimal: !!state.streamerPrefs.minimal,
+        };
+      } else {
+        this.streamerPrefs = { hideSettings: true, hideLog: true, hideRates: true, hideCurrency: false, hideGacha: false, dim: 0, minimal: false };
+      }
       if (state.rates && typeof state.rates === "object") {
         this.rates = { ...this.rates, ...state.rates };
       }
@@ -634,7 +754,6 @@ export class MainScene extends Phaser.Scene {
       this.fillSettingsInputs?.();
       this.setSfxBtnLabel?.();
       this.updateSfxIcon?.();
-      this.setStreamerBtnLabel?.();
       this.applyStreamerMode?.();
       if (this.allowRemoteChk) this.allowRemoteChk.checked = !!this.remoteAllowed;
       // connect remote if allowed
@@ -680,6 +799,7 @@ export class MainScene extends Phaser.Scene {
         crit: this.crit,
         sfxMuted: this.sfxMuted,
         streamerMode: this.streamerMode,
+        streamerPrefs: this.streamerPrefs || { hideSettings: true, hideLog: true, hideRates: true },
         remoteAllowed: this.remoteAllowed,
         roomCode: this.roomCode,
       };
@@ -864,12 +984,12 @@ export class MainScene extends Phaser.Scene {
         document.querySelectorAll('.team-context-menu').forEach(el => el.remove());
         const ascendEligible = m.level >= ASCEND.levelReq;
         const costCrystal = this.upgradeCostCrystals(m);
-        const needShards = UPGRADE.shard;
+        const needShards = this.upgradeCostShards(m);
         const haveC = (this.getCrystals?.() ?? 0) >= costCrystal;
         const haveS = (this.getShards?.() ?? 0) >= needShards;
         const canUpgrade = haveC && haveS && !m.locked;
         const upgradeTitle = canUpgrade ? '' : (!haveC ? `Butuh ${costCrystal} Crystals` : (!haveS ? `Butuh ${needShards} Shard` : (m.locked ? 'Unlock dulu' : '')));
-        const needAscShards = ASCEND.shards;
+        const needAscShards = this.ascendCostShards(m);
         const haveAscShards = (this.getShards?.() ?? 0) >= needAscShards;
         const canAscend = ascendEligible && haveAscShards && !m.locked;
         const ascendTitle = canAscend ? '' : (!ascendEligible ? `Butuh Lv ${ASCEND.levelReq}` : (!haveAscShards ? `Butuh ${needAscShards} Shard` : (m.locked ? 'Unlock dulu' : '')));
@@ -896,7 +1016,7 @@ export class MainScene extends Phaser.Scene {
             if (item.classList.contains('disabled')) return;
             if (action === 'upgrade') {
               const cost = this.upgradeCostCrystals(m);
-              const need = UPGRADE.shard;
+              const need = this.upgradeCostShards(m);
               const curC = this.getCrystals?.() ?? 0;
               const curS = this.getShards?.() ?? 0;
               if (m.locked) { this.log(`❌ ${m.name} terkunci`); return; }
@@ -918,7 +1038,7 @@ export class MainScene extends Phaser.Scene {
               this.saveState();
             } else if (action === 'ascend') {
               if (!m.rank) m.rank = 1;
-              const need = ASCEND.shards;
+              const need = this.ascendCostShards(m);
               const curS = this.getShards?.() ?? 0;
               if (m.locked) { this.log(`❌ ${m.name} terkunci`); return; }
               if (m.level < ASCEND.levelReq) { this.log(`❌ Ascend gagal: butuh Lv ${ASCEND.levelReq}`); return; }

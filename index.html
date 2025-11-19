@@ -42,7 +42,6 @@
           <div class="currency-label" style="margin-left:14px">🔷 Shards</div>
           <div id="shards" class="currency-value">0</div>
           <button id="toggleSfxBtn" class="btn-secondary" title="Toggle sound effects" style="margin-left:10px">🔊</button>
-          <button id="toggleStreamerBtn" class="btn-secondary" title="Toggle Streamer Mode (hotkey: S)" style="margin-left:8px">🎥 Stream Off</button>
         </div>
       </div>
     </header>
@@ -110,8 +109,10 @@
             </div>
             <div style="display:flex; gap:8px; margin-top:6px">
               <button id="saveSettingsBtn" class="btn-outline">💾 Save Settings</button>
+              <button id="saveGameBtn" class="btn-outline" title="Manual save game state">💾 Save Game</button>
               <button id="defaultSettingsBtn" class="btn-outline">↩ Reset Defaults</button>
-              <button id="clearSaveBtn" class="btn-outline" title="Clear local save">🧹 Clear Save</button>
+              <button id="clearSaveBtn" class="btn-outline" title="Clear local save (keep page)">🧹 Clear Save</button>
+              <button id="fullResetBtn" class="btn-outline" title="Wipe all & reload page">♻️ Full Reset</button>
             </div>
 
             <!-- Remote Control (opt-in) -->
@@ -200,5 +201,53 @@
       <button id="victoryNextBtn" class="btn-primary" style="width:100%">Next Stage</button>
     </div>
   </div>
+
+  <!-- Streamer Mode Modal (hotkey: S) -->
+  <div id="streamerModal" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:1000" aria-hidden="true">
+    <div id="streamerCard" style="background:rgba(255,255,255,0.06); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.2); border-radius:12px; padding:16px 20px; width:min(460px,92%); color:#cfeaff; text-align:left; box-shadow:0 10px 30px rgba(0,0,0,0.35); opacity:0; transform:scale(0.96); transition: opacity 180ms ease, transform 220ms cubic-bezier(0.2,0.8,0.2,1)">
+      <div style="font-size:20px; font-weight:800; margin-bottom:8px; text-align:center">🎥 Streamer Mode</div>
+      <div style="font-size:13px; opacity:0.9; margin-bottom:12px; text-align:center">
+        Tekan <b>S</b> untuk membuka/menutup menu ini. Preferensi disimpan otomatis.
+      </div>
+      <div style="display:flex; gap:16px; flex-wrap:wrap">
+        <div style="flex:1 1 220px">
+          <div style="font-weight:700; margin-bottom:8px">HUD Elements</div>
+          <label style="display:flex; align-items:center; gap:8px; margin:6px 0">
+            <input id="streamerHideSettingsChk" type="checkbox" /> Sembunyikan panel Settings
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin:6px 0">
+            <input id="streamerHideLogChk" type="checkbox" /> Sembunyikan Battle Log
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin:6px 0">
+            <input id="streamerHideRatesChk" type="checkbox" /> Sembunyikan Rates & Pity info
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin:6px 0">
+            <input id="streamerHideCurrencyChk" type="checkbox" /> Sembunyikan bar Currency
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin:6px 0">
+            <input id="streamerHideGachaChk" type="checkbox" /> Sembunyikan panel Gacha
+          </label>
+        </div>
+        <div style="flex:1 1 200px">
+          <div style="font-weight:700; margin-bottom:8px">Quick Actions</div>
+          <label style="display:flex; align-items:center; gap:8px; margin:6px 0">
+            <input id="streamerMinimalChk" type="checkbox" /> Minimal mode (hide all, dim)
+          </label>
+          <div style="display:flex; align-items:center; gap:8px; margin:8px 0">
+            <label for="streamerDimRange" style="min-width:110px">Dim overlay</label>
+            <input id="streamerDimRange" type="range" min="0" max="0.7" step="0.05" style="flex:1" />
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin:8px 0">
+            <button id="streamerSaveGameBtn" class="btn-outline">💾 Save Game</button>
+            <button id="streamerFullResetBtn" class="btn-outline">♻️ Full Reset</button>
+          </div>
+          <button id="streamerCloseBtn" class="btn-primary" style="width:100%">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Streamer Dim Overlay -->
+  <div id="dimOverlay" style="position:fixed; inset:0; background:rgba(0,0,0,0); pointer-events:none; z-index:900; display:block"></div>
 </body>
 </html>

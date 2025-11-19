@@ -1,13 +1,14 @@
 // Core constants and simple data
 
 export const YOUTUBER_POOL = [
-  { name: "Windah", atk: 6, hp: 24, rarity: "legend" },
-  { name: "MiawAug", atk: 5, hp: 26, rarity: "legend" },
-  { name: "NapLive", atk: 7, hp: 20, rarity: "rare" },
-  { name: "Ray Restu", atk: 8, hp: 18, rarity: "rare" },
-  { name: "Wielino", atk: 5, hp: 28, rarity: "epic" },
-  { name: "Dimsk", atk: 5, hp: 28, rarity: "epic" },
-  { name: "Jozzu RPGs", atk: 6, hp: 22, rarity: "common" },
+  { name: "Windah", atk: 20, hp: 30, rarity: "legend" },
+  { name: "MiawAug", atk: 30, hp: 20, rarity: "legend" },
+  { name: "NapLive", atk: 10, hp: 20, rarity: "epic" },
+  { name: "Wielino", atk: 12, hp: 18, rarity: "epic" },
+  { name: "Mythia", atk: 7, hp: 15, rarity: "epic" },
+  { name: "Ray Restu", atk: 8, hp: 14, rarity: "rare" },
+  { name: "Dimsk", atk: 6, hp: 10, rarity: "rare" },
+  { name: "Jozzu RPGs", atk: 5, hp: 12, rarity: "common" },
 ];
 
 export const RATES = {
@@ -29,12 +30,21 @@ export const GACHA_COST = { 1: 160, 10: 1600 };
 // Manual upgrade costs
 // base: flat crystals cost, perLevel: additional crystals per current level-1
 // shard: shards required per manual upgrade
-export const UPGRADE = { base: 240, perLevel: 40, shard: 1 };
+// Rarity-based cost multipliers (tune here)
+export const RARITY_COST_MULT = { common: 1.0, rare: 1.2, epic: 1.6, legend: 2.2 };
+
+export const UPGRADE = {
+  base: 240,
+  perLevel: 40,
+  shard: 1,
+  rarityCostMult: RARITY_COST_MULT,
+};
 
 // Ascend requirements and bonuses
 export const ASCEND = {
   levelReq: 5,
   shards: 3,
+  rarityShardMult: RARITY_COST_MULT,
   atkBonus: 5,
   hpBonus: 10,
 };
