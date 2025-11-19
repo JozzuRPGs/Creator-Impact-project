@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Creator Clash — Autobattler</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Lightweight autobattler prototype — gacha, merge dupes, and fight Dollar Kuning." />
+  <meta name="theme-color" content="#08121b" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- Phaser CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <!-- Inter font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap" rel="stylesheet">
+  <!-- Icons & Social -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <meta property="og:title" content="Creator Clash — Autobattler" />
+  <meta property="og:description" content="Gacha, merge, and autobattle your squad vs Dollar Kuning." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/og-image.svg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Creator Clash — Autobattler" />
+  <meta name="twitter:description" content="Gacha, merge, and autobattle your squad vs Dollar Kuning." />
+  <meta name="twitter:image" content="/og-image.svg" />
+</head>
+<body>
+  <div id="root">
+
+    <!-- HEADER -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="title">
+          <div class="title-main">Creator Clash</div>
+          <div class="title-sub">Autobattler • Gacha • Merge Dupe</div>
+        </div>
+        <div class="currency">
+          <div class="currency-label">💰 Crystals</div>
+          <div id="crystals" class="currency-value">900</div>
+          <button id="toggleSfxBtn" class="btn-secondary" title="Toggle sound effects" style="margin-left:10px">🔊</button>
+          <button id="toggleStreamerBtn" class="btn-secondary" title="Toggle Streamer Mode (hotkey: S)" style="margin-left:8px">🎥 Stream Off</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <!-- PHASER CANVAS -->
+      <div id="game-container" class="canvas-wrap"></div>
+
+      <!-- UI PANEL (glass) -->
+      <aside class="ui-panel" aria-hidden="false">
+
+        <!-- Gacha area -->
+        <div class="gacha-section">
+          <div class="gacha-top">✨ Event Banner</div>
+          <div class="gacha-controls">
+            <div class="gacha-left">
+              <div class="pull-options">
+                <label for="pullCount">Pull</label>
+                <select id="pullCount" class="select">
+                  <option value="1">1x</option>
+                  <option value="10">10x</option>
+                </select>
+              </div>
+              <div id="lastPull" class="last-pull">Last: —</div>
+              <div id="ratesInfo" class="last-pull"></div>
+              <div id="pityInfo" class="last-pull"></div>
+            </div>
+
+            <div class="gacha-right">
+              <!-- changed to .btn-gacha (UI kit) -->
+              <button id="gachaBtn" class="btn-gacha" aria-pressed="false">
+                <span class="gacha-btn-inner">🎰 GACHA</span>
+                <span class="gacha-sheen" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TEAM -->
+        <div class="panel-block">
+          <div class="panel-title">Your Squad</div>
+          <div style="margin-bottom:8px">
+            <button id="resetBtn" class="btn-outline">♻️ Reset Team</button>
+          </div>
+          <div id="teamList" class="char-list">
+            <div class="placeholder">No members yet — gacha dulu!</div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="panel-block" id="settingsPanel">
+          <div class="panel-title">Settings</div>
+          <div style="display:flex; flex-direction:column; gap:8px">
+            <div style="display:flex; gap:8px; flex-wrap:wrap">
+              <label>Common <input id="rateCommon" type="number" step="0.01" min="0" max="1" style="width:80px" /></label>
+              <label>Rare <input id="rateRare" type="number" step="0.01" min="0" max="1" style="width:80px" /></label>
+              <label>Epic <input id="rateEpic" type="number" step="0.01" min="0" max="1" style="width:80px" /></label>
+              <label>Legend <input id="rateLegend" type="number" step="0.01" min="0" max="1" style="width:80px" /></label>
+            </div>
+            <small class="last-pull">Tips: Rates should sum to 1.0; values will be normalized if not.</small>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px">
+              <label>Epic Pity <input id="pityEpicInput" type="number" step="1" min="1" max="999" style="width:90px" /></label>
+              <label>Legend Pity <input id="pityLegendInput" type="number" step="1" min="1" max="999" style="width:90px" /></label>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:6px">
+              <button id="saveSettingsBtn" class="btn-outline">💾 Save Settings</button>
+              <button id="defaultSettingsBtn" class="btn-outline">↩ Reset Defaults</button>
+              <button id="clearSaveBtn" class="btn-outline" title="Clear local save">🧹 Clear Save</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- DEVELOPER (hidden toggle: Ctrl+Alt+D) -->
+        <div class="panel-block" id="devPanel" style="display:none">
+          <div class="panel-title">Developer</div>
+          <small class="last-pull">Press Ctrl+Alt+D to toggle this panel</small>
+          <div style="display:flex; flex-direction:column; gap:10px; margin-top:8px">
+            <div style="display:flex; gap:6px; flex-wrap:wrap">
+              <button id="devC100" class="btn-outline">+100💰</button>
+              <button id="devC1000" class="btn-outline">+1000💰</button>
+              <button id="devHealTeam" class="btn-outline">Full Heal Team</button>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap">
+              <button id="devAddCommon" class="btn-secondary">Add Common</button>
+              <button id="devAddRare" class="btn-secondary">Add Rare</button>
+              <button id="devAddEpic" class="btn-secondary">Add Epic</button>
+              <button id="devAddLegend" class="btn-secondary">Add Legend</button>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
+              <label>By Name <input id="devNameInput" type="text" placeholder="Name" style="width:160px" /></label>
+              <button id="devAddByName" class="btn-outline">Add</button>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
+              <label>Stage <input id="devStageInput" type="number" min="1" step="1" style="width:90px" /></label>
+              <button id="devSetStage" class="btn-outline">Set Stage</button>
+              <label>Enemy HP <input id="devEnemyHpInput" type="number" min="0" step="1" style="width:110px" /></label>
+              <button id="devSetEnemyHp" class="btn-outline">Set HP</button>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap">
+              <button id="devForceWin" class="btn-primary">Force Victory</button>
+              <button id="devToggleStream" class="btn-outline">Toggle Streamer Mode</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTROLS -->
+        <div class="panel-block">
+          <div class="controls-row">
+            <div id="stageLabel" class="btn-secondary" aria-hidden="true" style="cursor:default">Stage 1</div>
+            <!-- use UI kit classes -->
+            <button id="battleBtn" class="btn-primary">⚔️ Battle vs Dollar Kuning</button>
+          </div>
+        </div>
+
+        <!-- BATTLE LOG -->
+        <div class="panel-block">
+          <div class="panel-title">Battle Log</div>
+          <div id="battleLog" class="battle-log">—</div>
+        </div>
+
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <small>Created By Jozzu RPGs 👑</small>
+    </footer>
+  </div>
+
+  <!-- game logic (modular) -->
+  <script type="module" src="src/main.js"></script>
+
+  <!-- Victory Recap Modal -->
+  <div id="victoryModal" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:1000" aria-hidden="true">
+    <div id="victoryCard" style="background:rgba(255,255,255,0.06); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.2); border-radius:12px; padding:16px 20px; width:min(420px,90%); color:#cfeaff; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.35); opacity:0; transform:scale(0.96); transition: opacity 180ms ease, transform 220ms cubic-bezier(0.2,0.8,0.2,1)">
+      <div style="font-size:22px; font-weight:700; margin-bottom:6px">🎉 Victory!</div>
+      <div id="victoryText" style="font-size:14px; opacity:0.9; margin-bottom:12px">Stage 1 cleared • Reward +120 Crystals</div>
+      <button id="victoryNextBtn" class="btn-primary" style="width:100%">Next Stage</button>
+    </div>
+  </div>
+</body>
+</html>

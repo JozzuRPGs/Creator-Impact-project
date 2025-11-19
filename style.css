@@ -1,0 +1,269 @@
+/* ===========================
+   Creator Clash — UI Styles
+   Honkai / Genshin-like aesthetic
+   =========================== */
+
+:root{
+  --bg-1: #041021;
+  --bg-2: #071018;
+  --glass: rgba(255,255,255,0.06);
+  --glass-2: rgba(255,255,255,0.04);
+  --accent: #7dd3fc;    /* cyan */
+  --accent2: #c084fc;   /* purple */
+  --gold: #ffdd57;
+  --muted: #94a3b8;
+  --card: rgba(255,255,255,0.03);
+  --glass-border: rgba(255,255,255,0.08);
+  --shadow: 0 8px 30px rgba(2,6,23,0.7);
+  --radius: 14px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%; margin:0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;}
+body{
+  background: linear-gradient(180deg,var(--bg-1) 0%, var(--bg-2) 100%);
+  color: #e6f0ff;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  padding-bottom: 40px;
+}
+
+/* ===== Topbar ===== */
+.topbar{
+  width:100%;
+  padding:18px 14px;
+  display:flex;
+  justify-content:center;
+}
+.topbar-inner{
+  max-width:1100px;
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: 16px;
+  padding:12px 18px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(6px) saturate(120%);
+}
+.title-main{
+  font-weight:800;
+  color: var(--gold);
+  font-size:1.15rem;
+  letter-spacing:0.4px;
+  text-shadow: 0 4px 18px rgba(255,200,50,0.06);
+}
+.title-sub{ font-size:0.85rem; color:var(--muted); margin-top:4px; }
+
+/* currency */
+.currency{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  background: rgba(255,255,255,0.02);
+  padding:6px 10px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.03);
+}
+.currency-label{ font-size:0.85rem; color:var(--muted) }
+.currency-value{ font-weight:800; color: white; padding-left:6px; font-size:1rem }
+
+/* ===== main layout ===== */
+.main{
+  max-width:1100px;
+  margin:18px auto;
+  padding: 0 14px;
+  display:flex;
+  gap:18px;
+  align-items:flex-start;
+}
+
+/* canvas */
+.canvas-wrap{
+  width:720px;
+  height:480px;
+  border-radius:14px;
+  overflow:hidden;
+  background: linear-gradient(180deg,#021018 0%, #051226 100%);
+  box-shadow: 0 18px 60px rgba(2,6,23,0.8);
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
+/* ui panel */
+.ui-panel{
+  flex:1;
+  min-height:480px;
+  border-radius:14px;
+  padding:14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px) saturate(120%);
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+/* panel blocks */
+.panel-block{ background: var(--card); padding:10px; border-radius:12px; border:1px solid rgba(255,255,255,0.02); }
+.panel-title{ font-weight:700; color:#fff; margin-bottom:8px; }
+
+/* gacha */
+.gacha-section{ padding:8px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.005)); border:1px solid rgba(255,255,255,0.02); }
+.gacha-top{ font-weight:700; color:var(--muted); margin-bottom:8px; }
+
+.gacha-controls{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.gacha-left{ display:flex; flex-direction:column; gap:8px; }
+.pull-options{ display:flex; gap:8px; align-items:center; color:var(--muted); font-weight:600; }
+.select{ background:rgba(255,255,255,0.02); color:var(--muted); padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); }
+.last-pull{ color:var(--muted); font-size:0.95rem }
+
+/* ===== UI KIT BUTTONS ===== */
+
+/* Generic small / base button */
+.btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+/* Primary big CTA */
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6, #7b9dff);
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(59,130,246,0.16);
+  font-size: 16px;
+  padding: 12px 22px;
+  border-radius: 12px;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 40px rgba(59,130,246,0.22); }
+
+/* Outline (ghost) */
+.btn-outline {
+  background: transparent;
+  color: #dfe7ff;
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 10px 18px;
+  border-radius: 12px;
+}
+.btn-outline:hover { background: rgba(255,255,255,0.02); transform: translateY(-2px); }
+
+/* Secondary small */
+.btn-secondary {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  font-size: 13px;
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+
+/* Gacha special (golden sweep) */
+.btn-gacha {
+  padding: 14px 28px;
+  font-size: 18px;
+  font-weight: 900;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffd86b, #ffb84d);
+  color: #4a2f00;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(255,184,80,0.18);
+}
+.btn-gacha::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -40%;
+  width: 50%;
+  height: 200%;
+  background: rgba(255,255,255,0.45);
+  transform: rotate(25deg);
+  animation: sheen 1.8s linear infinite;
+}
+@keyframes sheen {
+  0% { left: -60%; }
+  60% { left: 120%; }
+  100% { left: 120%; }
+}
+.btn-gacha:hover { transform: scale(1.04); box-shadow: 0 22px 60px rgba(255,184,80,0.28); }
+
+/* sheen used by old class kept for compatibility */
+.gacha-sheen{ display:none; }
+
+/* TEAM list */
+.char-list{ display:flex; flex-direction:column; gap:10px; max-height:220px; overflow:auto; padding-right:6px; }
+.placeholder{ color:var(--muted); font-size:0.95rem; padding:8px; }
+
+/* team item (card) */
+.team-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.008));
+  border-radius:10px;
+  padding:8px;
+  border: 1px solid rgba(255,255,255,0.02);
+}
+.team-left{ display:flex; gap:10px; align-items:center; }
+.team-avatar{
+  width:48px; height:48px; border-radius:10px;
+  background: linear-gradient(180deg,#111827,#0b1220);
+  display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--gold);
+  border: 1px solid rgba(255,255,255,0.02);
+  box-shadow: inset 0 -6px 12px rgba(0,0,0,0.3);
+}
+.team-name{ font-weight:700; color:#fff; }
+.team-meta{ font-size:0.85rem; color:var(--muted) }
+
+/* small button in list (use btn-secondary) */
+.btn.small, .btn-small { /* compatibility */
+  padding:6px 8px;
+  border-radius:8px;
+  background: linear-gradient(90deg,var(--gold),#ffd56b);
+  color:#071018;
+  border:none;
+  cursor:pointer;
+  font-weight:700;
+  box-shadow:0 8px 20px rgba(255,200,60,0.08);
+}
+.btn.small:hover, .btn-small:hover { transform: translateY(-2px); }
+
+/* controls */
+.controls-row{ display:flex; gap:10px; align-items:center; }
+
+/* battle log */
+.battle-log{
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+  padding:10px;
+  border-radius:10px;
+  min-height:120px;
+  max-height:220px;
+  overflow:auto;
+  color:var(--muted);
+  font-size:0.95rem;
+  border:1px solid rgba(255,255,255,0.02);
+}
+
+/* footer */
+.footer{ max-width:1100px; margin:14px auto 60px; color:var(--muted); text-align:center; font-size:0.85rem }
+
+/* responsiveness */
+@media (max-width:1024px){
+  .main{ flex-direction:column; align-items:center; }
+  .canvas-wrap{ width:92%; height:360px }
+  .ui-panel{ width:92% }
+  .topbar-inner{ flex-direction:column; gap:8px; align-items:flex-start }
+}
+
+/* tiny utilities */
+.hidden{ display:none; }
+
+/* Phaser canvas fills its container */
+#game-container { width: 720px; height: 480px; margin: 0 auto; display:block; border-radius:14px; overflow:hidden; }
