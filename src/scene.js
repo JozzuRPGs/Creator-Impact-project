@@ -87,6 +87,10 @@ export class MainScene extends Phaser.Scene {
     this.roomCodeInput = document.getElementById("roomCodeInput");
     this.copyRoomBtn = document.getElementById("copyRoomBtn");
     this.openControlLink = document.getElementById("openControlLink");
+    // Remote governance / audit elements
+    this.streamerRemoteLockChk = document.getElementById("streamerRemoteLockChk");
+    this.streamerRemoteLevelSel = document.getElementById("streamerRemoteLevelSel");
+    this.remoteAuditLog = document.getElementById("remoteAuditLog");
     // Developer panel hooks
     this.devPanel = document.getElementById("devPanel");
     this.devC100 = document.getElementById("devC100");
@@ -217,6 +221,12 @@ export class MainScene extends Phaser.Scene {
     this.devMode = false;
     this.remoteAllowed = false;
     this.roomCode = "";
+    // Remote governance state
+    this.remoteLock = false; // when true, all remote actions are ignored
+    this.remotePermissionLevel = 2; // 1=basic,2=power,3=admin
+    this._remoteCooldowns = {}; // action -> next usable timestamp
+    this._remoteAudit = []; // recent audit entries
+    this._remoteAuditMax = 10; // keep only last 10 entries per spec
     const updateStageLabel = () => {
       if (this.stageLabelEl) this.stageLabelEl.textContent = `Stage ${this.wave}`;
     };
@@ -767,18 +777,56 @@ export class MainScene extends Phaser.Scene {
     };
     this.handleRemoteEvent = (msg) => {
       if (!msg || !msg.type) return;
+      // Ignore acknowledgements / status events to prevent loops
+      if (msg.type === 'remoteAck' || msg.type === 'remoteStatus') return;
+      // basic debouncing
       const now = Date.now();
-      if (!this._lastRemote || now - this._lastRemote > 150) this._lastRemote = now; else return;
-      const A = this.devActions;
-      switch (msg.type) {
-        case 'addCrystals': A?.addCrystals?.(parseInt(msg.payload?.amount, 10) || 0); break;
-        case 'fullHeal': A?.fullHeal?.(); break;
-        case 'forceVictory': A?.forceWin?.(); break;
-        case 'addByRarity': if (msg.payload?.rarity) A?.addByRarity?.(String(msg.payload.rarity)); break;
-        case 'addByName': if ((msg.payload?.name || '').trim()) A?.addByName?.(String(msg.payload.name)); break;
-        case 'setStage': if (msg.payload?.stage) A?.setStage?.(parseInt(msg.payload.stage, 10)); break;
-        case 'setEnemyHp': if (msg.payload?.hp !== undefined) A?.setEnemyHp?.(parseInt(msg.payload.hp, 10)); break;
-        default: break;
+      if (!this._lastRemote || now - this._lastRemote > 120) this._lastRemote = now; else return;
+      // lock check
+      if (this.remoteLock) {
+        try { Remote.publish('remoteAck', { action: msg.type, status: 'locked' }); } catch {}
+        return;
+      }
+
+      // Registry describing remote actions
+      if (!this.remoteActions) {
+        const A = this.devActions;
+        this.remoteActions = {
+          addCrystals: { level: 1, cooldown: 3000, exec: (p) => A?.addCrystals?.(Math.max(1, Math.min(500, parseInt(p?.amount, 10) || 0))) },
+          fullHeal: { level: 2, cooldown: 10000, exec: () => A?.fullHeal?.() },
+            forceVictory: { level: 3, cooldown: 15000, exec: () => A?.forceWin?.() },
+          addByRarity: { level: 2, cooldown: 5000, exec: (p) => { const r = String(p?.rarity||'').toLowerCase(); if(['common','rare','epic','legend'].includes(r)) A?.addByRarity?.(r); } },
+          addByName: { level: 3, cooldown: 8000, exec: (p) => { const n = (p?.name||'').trim(); if(n) A?.addByName?.(n); } },
+          setStage: { level: 3, cooldown: 12000, exec: (p) => { const s = parseInt(p?.stage,10); if(!isNaN(s)) A?.setStage?.(Math.max(1, Math.min(999, s))); } },
+          setEnemyHp: { level: 2, cooldown: 5000, exec: (p) => { const hp = parseInt(p?.hp,10); if(!isNaN(hp) && this.enemy) A?.setEnemyHp?.(Math.max(1, Math.min(this.enemy.hp*4, hp))); } },
+          spawnFx: { level: 1, cooldown: 2000, exec: () => { this._spawnRemoteFx?.(); } },
+          showMessage: { level: 1, cooldown: 5000, exec: (p) => { const txt = (p?.text||'').trim().slice(0,60); if(txt) this._showRemoteOverlayMessage?.(txt); } },
+        };
+      }
+      const action = this.remoteActions[msg.type];
+      if (!action) {
+        try { Remote.publish('remoteAck', { action: msg.type, status: 'unknown' }); } catch {}
+        return;
+      }
+      // permission level check
+      if (action.level > this.remotePermissionLevel) {
+        try { Remote.publish('remoteAck', { action: msg.type, status: 'denied' }); } catch {}
+        return;
+      }
+      // cooldown check
+      const nextOk = this._remoteCooldowns[msg.type] || 0;
+      if (now < nextOk) {
+        try { Remote.publish('remoteAck', { action: msg.type, status: 'cooldown', left: nextOk - now }); } catch {}
+        return;
+      }
+      let ok = false;
+      try { action.exec?.(msg.payload || {}); ok = true; } catch (e) { ok = false; }
+      if (ok) {
+        this._remoteCooldowns[msg.type] = now + (action.cooldown || 0);
+        this._pushRemoteAudit(`${msg.type}`);
+        try { Remote.publish('remoteAck', { action: msg.type, status: 'ok', next: this._remoteCooldowns[msg.type] }); } catch {}
+      } else {
+        try { Remote.publish('remoteAck', { action: msg.type, status: 'error' }); } catch {}
       }
     };
     const onRemoteToggle = async () => {
@@ -787,6 +835,24 @@ export class MainScene extends Phaser.Scene {
       } else { this.remoteAllowed = false; await disconnectRemote(); }
       setRoomUi(); this.saveState();
     };
+    // Governance UI listeners
+    if (this.streamerRemoteLockChk) {
+      this.streamerRemoteLockChk.addEventListener('change', () => {
+        this.remoteLock = !!this.streamerRemoteLockChk.checked;
+        this._pushRemoteAudit(this.remoteLock ? 'LOCKED' : 'UNLOCKED');
+        try { Remote.publish('remoteStatus', { lock: this.remoteLock, level: this.remotePermissionLevel }); } catch {}
+        this.saveState();
+      });
+    }
+    if (this.streamerRemoteLevelSel) {
+      this.streamerRemoteLevelSel.addEventListener('change', () => {
+        const lv = parseInt(this.streamerRemoteLevelSel.value,10);
+        if(!isNaN(lv)) this.remotePermissionLevel = Math.max(1, Math.min(3, lv));
+        this._pushRemoteAudit(`perm=${this.remotePermissionLevel}`);
+        try { Remote.publish('remoteStatus', { lock: this.remoteLock, level: this.remotePermissionLevel }); } catch {}
+        this.saveState();
+      });
+    }
     this.allowRemoteChk?.addEventListener('change', onRemoteToggle);
     this.copyRoomBtn?.addEventListener('click', async () => {
       if (!this.remoteAllowed || !this.roomCode) return;
@@ -868,6 +934,10 @@ export class MainScene extends Phaser.Scene {
       this.streamerMode = true;
       if (typeof state.remoteAllowed === "boolean") this.remoteAllowed = state.remoteAllowed;
       if (typeof state.roomCode === "string") this.roomCode = state.roomCode;
+      if (typeof state.remoteLock === 'boolean') this.remoteLock = state.remoteLock;
+      if (typeof state.remotePermissionLevel === 'number') this.remotePermissionLevel = Math.max(1, Math.min(3, state.remotePermissionLevel));
+      if (this.streamerRemoteLockChk) this.streamerRemoteLockChk.checked = !!this.remoteLock;
+      if (this.streamerRemoteLevelSel) this.streamerRemoteLevelSel.value = String(this.remotePermissionLevel);
       this.updateStageLabel?.();
       this.updateGachaBtnState?.();
       this.updatePityInfo?.();
@@ -923,11 +993,58 @@ export class MainScene extends Phaser.Scene {
         streamerPrefs: this.streamerPrefs || { hideSettings: true, hideLog: true, hideRates: true },
         remoteAllowed: this.remoteAllowed,
         roomCode: this.roomCode,
+        remoteLock: this.remoteLock,
+        remotePermissionLevel: this.remotePermissionLevel,
       };
       localStorage.setItem("cc_state_v1", JSON.stringify(state));
     } catch (e) {
       console.warn("Failed to save state:", e);
     }
+  }
+
+  _pushRemoteAudit(msg) {
+    const ts = new Date().toLocaleTimeString();
+    this._remoteAudit.push(`[${ts}] ${msg}`);
+    if (this._remoteAudit.length > this._remoteAuditMax) this._remoteAudit.shift();
+    if (this.remoteAuditLog) {
+      const html = this._remoteAudit.map((line,i,arr)=>{
+        const isLast = i === arr.length - 1;
+        return `<div class="audit-entry${isLast? ' latest':''}">${line}</div>`;
+      }).join("");
+      this.remoteAuditLog.innerHTML = html;
+    }
+  }
+
+  _showRemoteOverlayMessage(text) {
+    // Simple ephemeral overlay using battle log + optional screen text
+    this.log(`🗨️ ${text}`);
+    const el = document.createElement('div');
+    el.textContent = text;
+    el.style.position = 'absolute';
+    el.style.left = '50%';
+    el.style.top = '60%';
+    el.style.transform = 'translate(-50%, -50%)';
+    el.style.padding = '6px 10px';
+    el.style.background = 'rgba(0,0,0,0.6)';
+    el.style.color = '#fff';
+    el.style.fontSize = '18px';
+    el.style.borderRadius = '6px';
+    el.style.pointerEvents = 'none';
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 150ms';
+    document.body.appendChild(el);
+    requestAnimationFrame(()=>{ el.style.opacity='1'; });
+    setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>{ el.remove(); },180); }, 2400);
+  }
+
+  _spawnRemoteFx() {
+    // Simple visual burst
+    const x = 360 + (Math.random()*300-150);
+    const y = 240 + (Math.random()*180-90);
+    const size = 20 + Math.random()*30;
+    const color = 0xffe500;
+    const rect = this.add.rectangle(x,y,size,size,color).setStrokeStyle(2,0x222222);
+    this.tweens.add({ targets: rect, scale: 0.3, alpha: 0, duration: 700, onComplete:()=>rect.destroy() });
   }
 
   setEnemy() {

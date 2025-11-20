@@ -11,8 +11,8 @@
     body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; color: #cfeaff; background: #08121b; }
     .wrap { max-width: 720px; margin: 24px auto; padding: 16px; border:1px solid rgba(255,255,255,0.15); border-radius: 12px; background: rgba(255,255,255,0.04); }
     .row { display:flex; gap:8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
-    .btn { background: rgba(255,255,255,0.08); color:#e6f4ff; border:1px solid rgba(255,255,255,0.2); border-radius: 8px; padding:8px 12px; cursor:pointer; }
-    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .btn { background: rgba(255,255,255,0.08); color:#e6f4ff; border:1px solid rgba(255,255,255,0.2); border-radius: 8px; padding:8px 12px; cursor:pointer; position:relative; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
     input, select { background: rgba(255,255,255,0.08); color:#e6f4ff; border:1px solid rgba(255,255,255,0.2); border-radius:6px; padding:6px 8px; }
     h1 { margin: 0 0 10px; font-size: 24px; }
     small { opacity: .8 }
@@ -27,12 +27,13 @@
       <button id="disconnect" class="btn" disabled>Disconnect</button>
       <small id="status">Not connected</small>
     </div>
+    <div id="remoteFeedback" style="margin:-4px 0 10px; font-size:12px; min-height:16px; color:#7dd3fc"></div>
 
     <div class="row">
-      <button class="btn" data-ev="addCrystals" data-amt="100">+100💰</button>
-      <button class="btn" data-ev="addCrystals" data-amt="1000">+1000💰</button>
-      <button class="btn" data-ev="fullHeal">Full Heal</button>
-      <button class="btn" data-ev="forceVictory">Force Victory</button>
+      <button class="btn" id="addCrystals100" data-ev="addCrystals" data-amt="100">+100💰</button>
+      <button class="btn" id="addCrystals1000" data-ev="addCrystals" data-amt="1000">+1000💰</button>
+      <button class="btn" id="fullHeal" data-ev="fullHeal">Full Heal</button>
+      <button class="btn" id="forceVictory" data-ev="forceVictory">Force Victory</button>
     </div>
 
     <div class="row">
@@ -42,23 +43,28 @@
         <option value="epic">Epic</option>
         <option value="legend">Legend</option>
       </select>
-      <button class="btn" id="addByRarity">Add Unit (Rarity)</button>
+      <button class="btn" id="addByRarity" data-ev="addByRarity">Add Unit (Rarity)</button>
       <input id="name" type="text" placeholder="Name" style="width:160px" />
-      <button class="btn" id="addByName">Add Unit (Name)</button>
+      <button class="btn" id="addByName" data-ev="addByName">Add Unit (Name)</button>
     </div>
 
     <div class="row">
       <label>Stage <input id="stage" type="number" min="1" step="1" style="width:90px" /></label>
-      <button class="btn" id="setStage">Set Stage</button>
+      <button class="btn" id="setStage" data-ev="setStage">Set Stage</button>
       <label>Enemy HP <input id="ehp" type="number" min="0" step="1" style="width:110px" /></label>
-      <button class="btn" id="setEnemyHp">Set HP</button>
+      <button class="btn" id="setEnemyHp" data-ev="setEnemyHp">Set HP</button>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="spawnFx" data-ev="spawnFx">Spawn FX ✨</button>
+      <input id="msgText" type="text" maxlength="60" placeholder="Show message" style="width:220px" />
+      <button class="btn" id="showMessage" data-ev="showMessage">Show Message 💬</button>
     </div>
 
     <small>Tip: Open from the game's Settings → Remote Control → Open Control to auto-fill room.</small>
   </div>
 
   <script type="module">
-    // helper to connect to Ably
     let client = null; let channel = null; let roomCode = '';
     const statusEl = document.getElementById('status');
     const setStatus = (t) => statusEl.textContent = t;
@@ -78,6 +84,28 @@
       setStatus(`Connected → ${room}`);
       document.getElementById('connect').disabled = true;
       document.getElementById('disconnect').disabled = false;
+      channel.subscribe(msg => {
+        try {
+          const data = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data;
+          if (data?.type === 'remoteAck') {
+            const { action, status, left } = data.payload || data;
+            let text=''; let kind='info';
+            switch(status){
+              case 'ok': text = `✅ ${action} executed`; break;
+              case 'locked': text = `🔒 Action blocked (locked)`; kind='warn'; break;
+              case 'denied': text = `⛔ Permission denied for ${action}`; kind='error'; break;
+              case 'cooldown': text = `⏳ ${action} cooldown ${(left/1000).toFixed(1)}s`; kind='warn'; break;
+              case 'unknown': text = `❓ Unknown action ${action}`; kind='warn'; break;
+              case 'error': text = `⚠️ Error executing ${action}`; kind='error'; break;
+              default: break;
+            }
+            if (text) setFeedback(text, kind);
+          } else if (data?.type === 'remoteStatus') {
+            const { lock, level } = data.payload || data;
+            setFeedback(lock ? `🔒 Locked • Perm L${level}` : `🟢 Ready • Perm L${level}`,'info');
+          }
+        } catch {}
+      });
     }
     async function disconnect() {
       try { if (channel) await channel.detach(); if (client) await client.close(); }
@@ -87,27 +115,80 @@
       if (!channel) return setStatus('Not connected');
       await channel.publish(type, { type, payload, t: Date.now() });
     }
+    function setFeedback(text, kind='info') {
+      const el = document.getElementById('remoteFeedback');
+      if (!el) return; el.textContent = text;
+      el.style.color = kind==='error' ? '#f87171' : (kind==='warn' ? '#fbbf24' : '#7dd3fc');
+    }
 
-    // UI wiring
     const roomInput = document.getElementById('room');
     roomInput.value = getRoomFromHash();
     document.getElementById('connect').onclick = () => connect(roomInput.value.trim());
     document.getElementById('disconnect').onclick = () => disconnect();
 
-    // Quick buttons
-    document.querySelectorAll('[data-ev="addCrystals"]').forEach(btn => btn.onclick = () => publish('addCrystals', { amount: parseInt(btn.dataset.amt, 10) }));
-    document.getElementById('fullHeal').onclick = () => publish('fullHeal', {});
-    document.getElementById('forceVictory').onclick = () => publish('forceVictory', {});
+    const cooldowns = {
+      addCrystals: 3000,
+      fullHeal: 10000,
+      forceVictory: 15000,
+      addByRarity: 5000,
+      addByName: 8000,
+      setStage: 12000,
+      setEnemyHp: 5000,
+      spawnFx: 2000,
+      showMessage: 5000,
+    };
+    const lastUsed = {};
 
-    document.getElementById('addByRarity').onclick = () => publish('addByRarity', { rarity: (document.getElementById('rarity').value) });
-    document.getElementById('addByName').onclick = () => publish('addByName', { name: (document.getElementById('name').value || '').trim() });
+    function useAction(type, payload) {
+      const now = Date.now();
+      const next = lastUsed[type] || 0;
+      if (now < next) return;
+      publish(type, payload);
+      lastUsed[type] = now + (cooldowns[type] || 0);
+      document.querySelectorAll(`[data-ev="${type}"]`).forEach(btn => {
+        btn.disabled = true;
+        const cd = cooldowns[type] || 0;
+        btn.dataset.cdEnd = String(now + cd);
+        setTimeout(() => { btn.disabled = false; if (btn.dataset.baseLabel) btn.textContent = btn.dataset.baseLabel; btn.removeAttribute('data-cd-end'); }, cd);
+      });
+    }
 
-    document.getElementById('setStage').onclick = () => publish('setStage', { stage: parseInt(document.getElementById('stage').value, 10) });
-    document.getElementById('setEnemyHp').onclick = () => publish('setEnemyHp', { hp: parseInt(document.getElementById('ehp').value, 10) });
+    let cdTickerStarted = false;
+    function startCdTicker(){
+      if (cdTickerStarted) return; cdTickerStarted = true;
+      document.querySelectorAll('[data-ev]').forEach(btn => { btn.dataset.baseLabel = btn.textContent; });
+      function tick(){
+        const now = Date.now();
+        document.querySelectorAll('[data-cd-end]').forEach(btn => {
+          const end = parseInt(btn.dataset.cdEnd,10)||0;
+          if (end > now) {
+            const left = (end - now)/1000;
+            btn.textContent = `${btn.dataset.baseLabel} (${left.toFixed(1)}s)`;
+          }
+        });
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    startCdTicker();
 
-    // buttons without ids were selected via data-ev; ensure ids exist
-    document.getElementById('fullHeal').disabled = false;
-    document.getElementById('forceVictory').disabled = false;
+    document.querySelectorAll('[data-ev]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset.ev;
+        switch(type) {
+          case 'addCrystals': return useAction(type, { amount: parseInt(btn.dataset.amt, 10) });
+          case 'fullHeal': return useAction(type, {});
+          case 'forceVictory': return useAction(type, {});
+          case 'addByRarity': return useAction(type, { rarity: document.getElementById('rarity').value });
+          case 'addByName': return useAction(type, { name: (document.getElementById('name').value || '').trim() });
+          case 'setStage': return useAction(type, { stage: parseInt(document.getElementById('stage').value, 10) });
+          case 'setEnemyHp': return useAction(type, { hp: parseInt(document.getElementById('ehp').value, 10) });
+          case 'spawnFx': return useAction(type, {});
+          case 'showMessage': return useAction(type, { text: (document.getElementById('msgText').value || '').trim() });
+          default: break;
+        }
+      });
+    });
   </script>
 </body>
 </html>

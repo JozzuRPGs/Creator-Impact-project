@@ -183,6 +183,15 @@
           <div id="battleLog" class="battle-log">—</div>
         </div>
 
+        <!-- REMOTE ACTIONS AUDIT -->
+        <div class="panel-block" id="remoteAuditPanel">
+          <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center; gap:8px">
+            <span>Remote Actions</span>
+            <span id="remoteAiBadge" style="font-size:11px; font-weight:700; padding:3px 6px; border-radius:6px; background:linear-gradient(90deg,#3b82f6,#7b9dff); color:#fff; letter-spacing:0.5px">LIVE</span>
+          </div>
+          <div id="remoteAuditLog" class="battle-log remote-audit" style="min-height:70px">—</div>
+        </div>
+
       </aside>
     </main>
 
@@ -247,6 +256,17 @@
           <div style="font-weight:700; margin-bottom:8px">Quick Actions</div>
           <label style="display:flex; align-items:center; gap:8px; margin:6px 0">
             <input id="streamerMinimalChk" type="checkbox" /> Minimal mode (hide all, dim)
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin:6px 0">
+            <input id="streamerRemoteLockChk" type="checkbox" /> Lock remote (block actions)
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12px">
+            Permission
+            <select id="streamerRemoteLevelSel" style="flex:1; min-width:110px">
+              <option value="1">Level 1 (FX / Msg)</option>
+              <option value="2" selected>Level 2 (+Resources)</option>
+              <option value="3">Level 3 (Stage / Force)</option>
+            </select>
           </label>
           <div style="display:flex; align-items:center; gap:8px; margin:8px 0">
             <label for="streamerDimRange" style="min-width:110px">Dim overlay</label>
