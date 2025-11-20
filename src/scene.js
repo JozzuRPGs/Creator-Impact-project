@@ -60,6 +60,7 @@ export class MainScene extends Phaser.Scene {
     this.battleLogEl = document.getElementById("battleLog");
     this.crystalsEl = document.getElementById("crystals");
     this.shardsEl = document.getElementById("shards");
+    this.roomCodeHeader = document.getElementById("roomCodeHeader");
     this.ratesInfoEl = document.getElementById("ratesInfo");
     this.pityInfoEl = document.getElementById("pityInfo");
     this.stageLabelEl = document.getElementById("stageLabel");
@@ -109,6 +110,12 @@ export class MainScene extends Phaser.Scene {
     this.victoryCard = document.getElementById("victoryCard");
     this.victoryTextEl = document.getElementById("victoryText");
     this.victoryNextBtn = document.getElementById("victoryNextBtn");
+    // Game over elements
+    this.gameOverModal = document.getElementById("gameOverModal");
+    this.gameOverCard = document.getElementById("gameOverCard");
+    this.gameOverTextEl = document.getElementById("gameOverText");
+    this.gameOverResetBtn = document.getElementById("gameOverResetBtn");
+    this.gameOverCloseBtn = document.getElementById("gameOverCloseBtn");
     // Settings controls
     this.rateCommonEl = document.getElementById("rateCommon");
     this.rateRareEl = document.getElementById("rateRare");
@@ -275,6 +282,8 @@ export class MainScene extends Phaser.Scene {
     };
 
     this.resetBtn.onclick = () => {
+      const ok = window.confirm("Yakin reset team? Aksi ini tidak bisa dibatalkan.");
+      if (!ok) return;
       team = [];
       nextId = 1;
       this.renderTeamSprites();
@@ -318,6 +327,8 @@ export class MainScene extends Phaser.Scene {
     updatePityInfo();
 
     this.clearSaveBtn?.addEventListener("click", () => {
+      const ok = window.confirm("Yakin hapus save lokal? Ini akan reset semua progres (halaman tidak direload).");
+      if (!ok) return;
       try { localStorage.removeItem("cc_state_v1"); } catch {}
       // reset runtime state
       team = [];
@@ -342,6 +353,8 @@ export class MainScene extends Phaser.Scene {
     });
     // Full reset helper
     const doFullReset = () => {
+      const input = window.prompt("Full Reset: ketik YES untuk menghapus semua progres dan reload.", "");
+      if (!input || input.trim().toUpperCase() !== "YES") { this.log("❎ Full Reset dibatalkan."); return; }
       try { localStorage.removeItem("cc_state_v1"); } catch {}
       team = [];
       nextId = 1;
@@ -532,6 +545,46 @@ export class MainScene extends Phaser.Scene {
     this.showVictory = showVictory;
     this.hideVictory = hideVictory;
     this.victoryNextBtn?.addEventListener('click', () => hideVictory());
+        // Game Over wiring
+        // Centralized soft reset to Stage 1 (no hard clear of localStorage key)
+        this.resetGameToStage1 = () => {
+          team = [];
+          nextId = 1;
+          this.wave = 1;
+          this.pityEpic = 0;
+          this.pityLegend = 0;
+          this.setCrystals(900);
+          this.setShards(0);
+          this.updateStageLabel();
+          this.renderTeamSprites();
+          this.setEnemy();
+          this.setGachaLock(false);
+          this.saveState();
+          this.log('↩ Game reset ke Stage 1.');
+        };
+        this.showGameOver = (wave) => {
+          if (!this.gameOverModal) return;
+          this.gameOverTextEl && (this.gameOverTextEl.textContent = `Tim kamu kalah di Stage ${wave}. `);
+          this.gameOverModal.style.display = 'flex';
+          requestAnimationFrame(() => {
+            if (this.gameOverCard) { this.gameOverCard.style.opacity = '1'; this.gameOverCard.style.transform = 'scale(1)'; }
+          });
+          if (!this.sfxMuted) { this.beep(320, 140, 'sine', 0.06); this.time.delayedCall(120, () => this.beep(250, 160, 'sine', 0.06)); }
+        };
+        this.hideGameOver = () => {
+          if (!this.gameOverModal) return;  
+          if (this.gameOverCard) { this.gameOverCard.style.opacity = '0'; this.gameOverCard.style.transform = 'scale(0.96)'; }
+          setTimeout(() => { if (this.gameOverModal) this.gameOverModal.style.display = 'none'; }, 180);
+        };
+        // Close only hides the modal; player chooses when to reset
+        this.gameOverCloseBtn?.addEventListener('click', () => {
+          this.hideGameOver?.();
+        });
+        this.gameOverResetBtn?.addEventListener('click', () => {
+          this.resetGameToStage1?.();
+          this.hideGameOver?.();
+        });
+
     this._victoryKeyHandler = (e) => {
       if (this.victoryModal && this.victoryModal.style.display !== 'none') {
         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
@@ -688,6 +741,9 @@ export class MainScene extends Phaser.Scene {
         if (this.remoteAllowed && this.roomCode) url.hash = '#room=' + this.roomCode;
         this.openControlLink.href = url.toString();
       }
+      if (this.roomCodeHeader) {
+        this.roomCodeHeader.textContent = (this.remoteAllowed && this.roomCode) ? this.roomCode : '(off)';
+      }
     };
     this._remoteConnected = false;
     const connectRemote = async () => {
@@ -736,6 +792,28 @@ export class MainScene extends Phaser.Scene {
       if (!this.remoteAllowed || !this.roomCode) return;
       try { await navigator.clipboard.writeText(this.roomCode); this.log('📋 Room copied'); } catch {}
     });
+
+    // === Auto-enable Remote Control (streamer doesn't need to tick checkbox) ===
+    // If remote was not previously allowed (fresh session), turn it on automatically.
+    // Preserve existing user choice if they had disabled it in a prior saved state.
+    if (this.allowRemoteChk && !this.remoteAllowed) {
+      this.remoteAllowed = true;
+      this.allowRemoteChk.checked = true;
+      if (!this.roomCode) this.roomCode = randRoom();
+      setRoomUi();
+      // Connect immediately if not already connected
+      if (!this._remoteConnected) {
+        connectRemote();
+        this.log(`🛰 Remote auto-enabled (room ${this.roomCode})`);
+      }
+      this.saveState();
+    } else if (this.allowRemoteChk && this.remoteAllowed) {
+      // Ensure checkbox reflects restored state and connect if needed
+      this.allowRemoteChk.checked = true;
+      if (!this._remoteConnected) connectRemote();
+      setRoomUi();
+    }
+    // === End auto-enable ===
   }
 
   async initState() {
@@ -1341,6 +1419,8 @@ export class MainScene extends Phaser.Scene {
       this.showVictory?.(reward, clearedStage, this.wave);
     } else {
       this.log(`💀 Defeat... Your team was wiped.`);
+      // Show Game Over; wait for player to press the button
+      this.showGameOver?.(this.wave);
     }
 
     this.updateEnemyUI();

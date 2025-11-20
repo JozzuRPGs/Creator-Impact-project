@@ -41,6 +41,8 @@
           <div id="crystals" class="currency-value">900</div>
           <div class="currency-label" style="margin-left:14px">🔷 Shards</div>
           <div id="shards" class="currency-value">0</div>
+          <div class="currency-label" style="margin-left:14px">📡 Room</div>
+          <div id="roomCodeHeader" class="currency-value" title="Remote room code">(off)</div>
           <button id="toggleSfxBtn" class="btn-secondary" title="Toggle sound effects" style="margin-left:10px">🔊</button>
         </div>
       </div>
@@ -200,6 +202,18 @@
       <div style="font-size:22px; font-weight:700; margin-bottom:6px">🎉 Victory!</div>
       <div id="victoryText" style="font-size:14px; opacity:0.9; margin-bottom:12px">Stage 1 cleared • Reward +120 Crystals</div>
       <button id="victoryNextBtn" class="btn-primary" style="width:100%">Next Stage</button>
+    </div>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div id="gameOverModal" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:1000" aria-hidden="true">
+    <div id="gameOverCard" style="background:rgba(255,255,255,0.06); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.2); border-radius:12px; padding:16px 20px; width:min(420px,90%); color:#cfeaff; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.35); opacity:0; transform:scale(0.96); transition: opacity 180ms ease, transform 220ms cubic-bezier(0.2,0.8,0.2,1)">
+      <div style="font-size:22px; font-weight:800; margin-bottom:6px">💀 Game Over</div>
+      <div id="gameOverText" style="font-size:14px; opacity:0.9; margin-bottom:12px">Tim kamu kalah di Stage 1.</div>
+      <div style="display:flex; gap:8px">
+        <button id="gameOverResetBtn" class="btn-primary" style="flex:1">↩ Reset Game</button>
+        <button id="gameOverCloseBtn" class="btn-outline" style="flex:1">Close</button>
+      </div>
     </div>
   </div>
 
