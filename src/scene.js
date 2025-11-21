@@ -47,6 +47,9 @@ export class MainScene extends Phaser.Scene {
     this.renderTeamSprites();
     this.setEnemy();
     this.createSfxIcon();
+    
+    // Hide loading overlay after everything is loaded
+    this.hideLoadingOverlay();
   }
 
   setupHtmlHooks() {
@@ -271,6 +274,7 @@ export class MainScene extends Phaser.Scene {
       for (let i = 0; i < count; i++) {
         results.push(this.performGacha());
       }
+      console.log("🎰 After gacha, team array:", team.length, team.map(m => m.name));
       const last = results[results.length - 1];
       this.lastPull.innerText = `Last: ${emojiForRarity(last.rarity)} ${last.name} (Lv ${last.level}) — Spent ${spent}`;
       this.log(
@@ -872,7 +876,7 @@ export class MainScene extends Phaser.Scene {
         connectRemote();
         this.log(`🛰 Remote auto-enabled (room ${this.roomCode})`);
       }
-      this.saveState();
+      // Note: saveState() will be called after initState() loads existing data
     } else if (this.allowRemoteChk && this.remoteAllowed) {
       // Ensure checkbox reflects restored state and connect if needed
       this.allowRemoteChk.checked = true;
@@ -882,11 +886,47 @@ export class MainScene extends Phaser.Scene {
     // === End auto-enable ===
   }
 
+  hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.style.display = 'none'; }, 300);
+    }
+  }
+
+  showSaveIndicator() {
+    // Quick flash to show game is saving
+    const indicator = document.createElement('div');
+    indicator.textContent = '💾 Saved';
+    indicator.style.position = 'fixed';
+    indicator.style.top = '20px';
+    indicator.style.right = '20px';
+    indicator.style.padding = '8px 16px';
+    indicator.style.background = 'rgba(102,194,255,0.9)';
+    indicator.style.color = '#071018';
+    indicator.style.borderRadius = '8px';
+    indicator.style.fontWeight = '700';
+    indicator.style.fontSize = '14px';
+    indicator.style.zIndex = '10000';
+    indicator.style.opacity = '0';
+    indicator.style.transition = 'opacity 0.2s ease';
+    document.body.appendChild(indicator);
+    requestAnimationFrame(() => { indicator.style.opacity = '1'; });
+    setTimeout(() => {
+      indicator.style.opacity = '0';
+      setTimeout(() => { indicator.remove(); }, 200);
+    }, 1500);
+  }
+
   async initState() {
     try {
       const raw = localStorage.getItem("cc_state_v1");
-      if (!raw) return;
+      if (!raw) {
+        console.log("📂 No save data found, starting fresh");
+        return;
+      }
       const state = JSON.parse(raw);
+      console.log("📂 Loading save data:", { team: state.team?.length, teamNames: state.team?.map(t => t.name), crystals: state.crystals, wave: state.wave });
       if (Array.isArray(state.team)) {
         // restore team and nextId (add defaults for new props)
         team = state.team.map((m) => ({
@@ -959,6 +999,9 @@ export class MainScene extends Phaser.Scene {
         await Remote.subscribe((data) => this.handleRemoteEvent?.(data));
         this._remoteConnected = true;
       }} catch {}
+      // Save state after loading to persist any new defaults (e.g., remote auto-enable)
+      // This only happens if setupHtmlHooks set remoteAllowed=true for first-time users
+      this.saveState();
     } catch (e) {
       console.warn("Failed to load state:", e);
     }
@@ -966,6 +1009,7 @@ export class MainScene extends Phaser.Scene {
 
   saveState() {
     try {
+      console.log("💾 Saving... Current team array:", team.length, team.map(m => m.name));
       const teamSave = team.map(m => ({
         id: m.id,
         name: m.name,
@@ -997,6 +1041,8 @@ export class MainScene extends Phaser.Scene {
         remotePermissionLevel: this.remotePermissionLevel,
       };
       localStorage.setItem("cc_state_v1", JSON.stringify(state));
+      console.log("💾 Game saved:", { team: teamSave.length, teamNames: teamSave.map(t => t.name), crystals: state.crystals, wave: state.wave });
+      this.showSaveIndicator();
     } catch (e) {
       console.warn("Failed to save state:", e);
     }
@@ -1116,7 +1162,6 @@ export class MainScene extends Phaser.Scene {
         this.pityEpic += 1; this.pityLegend += 1;
       }
       this.updatePityInfo?.();
-      this.saveState();
       return existing;
     } else {
       const inst = {
@@ -1141,7 +1186,6 @@ export class MainScene extends Phaser.Scene {
         this.pityEpic += 1; this.pityLegend += 1;
       }
       this.updatePityInfo?.();
-      this.saveState();
       return inst;
     }
   }
