@@ -2,15 +2,17 @@
 
 export const YOUTUBER_POOL = [
   // Legend: higher base, one tanky, one DPS
-  { name: "Windah", atk: 22, hp: 32, rarity: "legend" },
-  { name: "MiawAug", atk: 26, hp: 28, rarity: "legend" },
+  { name: "Windah", atk: 32, hp: 32, rarity: "legend" },
+  { name: "MiawAug", atk: 36, hp: 28, rarity: "legend" },
   // Epic: clearly above rare, some flavor differences
-  { name: "NapLive", atk: 12, hp: 22, rarity: "epic" },
+  { name: "Bang AL", atk: 12, hp: 22, rarity: "epic" },
   { name: "Wielino", atk: 14, hp: 20, rarity: "epic" },
-  { name: "Mythia", atk: 11, hp: 18, rarity: "epic" },
+  { name: "Mythia Brot2", atk: 11, hp: 18, rarity: "epic" },
+  { name: "Reza Auditore", atk: 11, hp: 18, rarity: "epic" },
   // Rare: mid-tier baseline
-  { name: "Ray Restu", atk: 9, hp: 16, rarity: "rare" },
-  { name: "Dimsk", atk: 7, hp: 12, rarity: "rare" },
+  { name: "Om Ray", atk: 9, hp: 12, rarity: "rare" },
+  { name: "Dimsk", atk: 7, hp: 16, rarity: "rare" },
+  { name: "Caveine", atk: 9, hp: 12, rarity: "rare" },
   { name: "Jozzu RPGs", atk: 5, hp: 12, rarity: "common" },
 ];
 
