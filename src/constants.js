@@ -1,13 +1,19 @@
 // Core constants and simple data
 
 export const YOUTUBER_POOL = [
-  { name: "Windah", atk: 6, hp: 24, rarity: "legend" },
-  { name: "MiawAug", atk: 5, hp: 26, rarity: "legend" },
-  { name: "NapLive", atk: 7, hp: 20, rarity: "rare" },
-  { name: "Ray Restu", atk: 8, hp: 18, rarity: "rare" },
-  { name: "Wielino", atk: 5, hp: 28, rarity: "epic" },
-  { name: "Dimsk", atk: 5, hp: 28, rarity: "epic" },
-  { name: "Jozzu RPGs", atk: 6, hp: 22, rarity: "common" },
+  // Legend: higher base, one tanky, one DPS
+  { name: "Windah", atk: 32, hp: 32, rarity: "legend" },
+  { name: "MiawAug", atk: 36, hp: 28, rarity: "legend" },
+  // Epic: clearly above rare, some flavor differences
+  { name: "Bang AL", atk: 12, hp: 22, rarity: "epic" },
+  { name: "Wielino", atk: 14, hp: 20, rarity: "epic" },
+  { name: "Mythia Brot2", atk: 11, hp: 18, rarity: "epic" },
+  { name: "Reza Auditore", atk: 11, hp: 18, rarity: "epic" },
+  // Rare: mid-tier baseline
+  { name: "Om Ray", atk: 9, hp: 12, rarity: "rare" },
+  { name: "Dimsk", atk: 7, hp: 16, rarity: "rare" },
+  { name: "Caveine", atk: 9, hp: 12, rarity: "rare" },
+  { name: "Jozzu RPGs", atk: 5, hp: 12, rarity: "common" },
 ];
 
 export const RATES = {
@@ -29,15 +35,29 @@ export const GACHA_COST = { 1: 160, 10: 1600 };
 // Manual upgrade costs
 // base: flat crystals cost, perLevel: additional crystals per current level-1
 // shard: shards required per manual upgrade
-export const UPGRADE = { base: 240, perLevel: 40, shard: 1 };
+// Rarity-based cost multipliers (tune here)
+export const RARITY_COST_MULT = { common: 1.0, rare: 1.2, epic: 1.6, legend: 2.2 };
+
+export const UPGRADE = {
+  base: 240,
+  perLevel: 40,
+  shard: 1,
+  rarityCostMult: RARITY_COST_MULT,
+};
 
 // Ascend requirements and bonuses
 export const ASCEND = {
   levelReq: 5,
   shards: 3,
-  atkBonus: 5,
-  hpBonus: 10,
+  rarityShardMult: RARITY_COST_MULT,
+  atkBonus: 7,
+  hpBonus: 14,
+  // Each additional rank increases bonus by this fraction (e.g., 0.25 => +25% per rank)
+  rankScale: 0.25,
 };
+
+// Rarity-based stat scaling per level (higher rarity scales faster)
+export const RARITY_STAT_MULT = { common: 1.0, rare: 1.2, epic: 1.5, legend: 2.0 };
 
 // Pity settings (number of pulls guaranteeing at least that rarity)
 export const PITY = { epic: 20, legend: 60 };
